@@ -131,13 +131,7 @@ final readonly class PropertyReflector implements Reflector, Stringable
         $aliases = $this->getUseAliases();
 
         if (isset($aliases[$firstSegment])) {
-            $remainder = array_slice($segments, 1);
-
-            if ($remainder === []) {
-                return $aliases[$firstSegment];
-            }
-
-            return $aliases[$firstSegment] . '\\' . implode('\\', $remainder);
+            return implode('\\', [$aliases[$firstSegment], ...array_slice($segments, 1)]);
         }
 
         $namespace = $this->getClass()->getReflection()->getNamespaceName();
@@ -172,7 +166,14 @@ final readonly class PropertyReflector implements Reflector, Stringable
     /** @return array<string, string> */
     private function parseUseStatements(string $fileName): array
     {
-        $tokens = token_get_all(file_get_contents($fileName));
+        // Unreadable files (eval'd code, phar paths) emit a warning we handle as empty aliases.
+        $source = @file_get_contents($fileName);
+
+        if ($source === false) {
+            return [];
+        }
+
+        $tokens = token_get_all($source);
 
         $aliases = [];
         $depth = 0;
@@ -197,8 +198,8 @@ final readonly class PropertyReflector implements Reflector, Stringable
 
             $next = $tokens[$i + 1] ?? null;
 
-            // Skip `use function ...` and `use const ...` statements.
-            if (is_array($next) && in_array($next[0], [T_FUNCTION, T_CONST], true)) {
+            // Skip `use function ...`, `use const ...` and closure `use (...)`.
+            if ($next === '(' || is_array($next) && in_array($next[0], [T_FUNCTION, T_CONST], true)) {
                 continue;
             }
 
@@ -244,7 +245,8 @@ final readonly class PropertyReflector implements Reflector, Stringable
             $name = trim($parts[0]);
             $alias = $parts[1] ?? null;
 
-            if ($name === '') {
+            // Skip `function`/`const` members of grouped imports.
+            if ($name === '' || str_starts_with($name, 'function ') || str_starts_with($name, 'const ')) {
                 continue;
             }
 
