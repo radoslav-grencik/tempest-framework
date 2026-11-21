@@ -21,8 +21,11 @@ use Tempest\Database\QueryStatements\CreateTableStatement;
 use Tempest\Database\QueryStatements\DropTableStatement;
 use Tempest\Database\ShouldMigrate;
 use Tempest\Framework\Testing\TestingDatabaseInitializer;
+use Tests\Tempest\Fixtures\Migrations\CreateAuthorTable;
 use Tests\Tempest\Fixtures\Migrations\CreateBookTable;
+use Tests\Tempest\Fixtures\Migrations\CreateChapterTable;
 use Tests\Tempest\Fixtures\Migrations\CreatePublishersTable;
+use Tests\Tempest\Fixtures\Modules\Books\Models\Author;
 use Tests\Tempest\Fixtures\Modules\Books\Models\Book;
 use Tests\Tempest\Fixtures\Modules\Books\Models\Publisher;
 use Tests\Tempest\Integration\FrameworkIntegrationTestCase;
@@ -150,6 +153,52 @@ final class MultiDatabaseTest extends FrameworkIntegrationTestCase
 
         $this->assertSame(1, query(Publisher::class)->count()->onDatabase('main')->execute());
         $this->assertSame(2, query(Publisher::class)->count()->onDatabase('backup')->execute());
+    }
+
+    #[Test]
+    public function relation_inserts_use_the_selected_database(): void
+    {
+        $this->prepareRelationDatabases();
+
+        $id = query(Book::class)
+            ->onDatabase('backup')
+            ->insert(
+                title: 'Backup book',
+                author: ['name' => 'Backup author'],
+                chapters: [['title' => 'First chapter']],
+            )
+            ->execute();
+
+        $this->assertInstanceOf(PrimaryKey::class, $id);
+        $book = Book::on('backup')->select()->with('author', 'chapters')->get($id);
+
+        $this->assertInstanceOf(Book::class, $book);
+        $this->assertSame('Backup author', $book->author?->name);
+        $this->assertSame(['First chapter'], array_column($book->chapters, 'title'));
+        $this->assertSame(0, query('authors')->count()->execute());
+        $this->assertSame(0, query('chapters')->count()->execute());
+    }
+
+    #[Test]
+    public function relation_updates_use_the_selected_database(): void
+    {
+        $this->prepareRelationDatabases();
+
+        $main = Book::create(title: 'Main book', chapters: [['title' => 'Main chapter']]);
+        $backup = Book::on('backup')->create(title: 'Backup book');
+
+        $backup->onDatabase('backup')->update(chapters: [['title' => 'Backup chapter']]);
+        $backup->onDatabase('backup')->update(author: new Author('Backup author'));
+
+        $main = Book::select()->with('chapters')->get($main->id);
+        $backup = Book::on('backup')->select()->with('author', 'chapters')->get($backup->id);
+
+        $this->assertInstanceOf(Book::class, $main);
+        $this->assertInstanceOf(Book::class, $backup);
+        $this->assertSame(['Main chapter'], array_column($main->chapters, 'title'));
+        $this->assertSame(['Backup chapter'], array_column($backup->chapters, 'title'));
+        $this->assertSame('Backup author', $backup->author?->name);
+        $this->assertSame(0, query('authors')->count()->execute());
     }
 
     #[Test]
@@ -364,6 +413,20 @@ final class MultiDatabaseTest extends FrameworkIntegrationTestCase
             'Timeline Taxi',
             query(Book::class)->select()->onDatabase('backup')->where('title', 'Timeline Taxi')->first()->title,
         );
+    }
+
+    private function prepareRelationDatabases(): void
+    {
+        $migrationManager = $this->container->get(MigrationManager::class);
+
+        foreach ([null, 'backup'] as $tag) {
+            $manager = $migrationManager->onDatabase($tag);
+            $manager->executeUp(new CreateMigrationsTable());
+            $manager->executeUp(new CreatePublishersTable());
+            $manager->executeUp(new CreateAuthorTable());
+            $manager->executeUp(new CreateBookTable());
+            $manager->executeUp(new CreateChapterTable());
+        }
     }
 
     private function assertTableExists(string $tableName, string $onDatabase): void

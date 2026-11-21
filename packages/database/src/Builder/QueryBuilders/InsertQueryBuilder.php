@@ -264,7 +264,7 @@ final class InsertQueryBuilder implements BuildsQuery
                 model: $hasMany->property->getIterableType()->asClass(),
                 rows: $insert,
                 serializerFactory: $this->serializerFactory,
-            );
+            )->onDatabase($this->onDatabase);
         };
     }
 
@@ -327,7 +327,9 @@ final class InsertQueryBuilder implements BuildsQuery
                         model: $targetModel->getName(),
                         rows: [$related],
                         serializerFactory: $this->serializerFactory,
-                    )->execute(),
+                    )
+                        ->onDatabase($this->onDatabase)
+                        ->execute(),
                 };
 
                 $pivotRows[] = [
@@ -344,7 +346,7 @@ final class InsertQueryBuilder implements BuildsQuery
                 model: $pivotTable,
                 rows: $pivotRows,
                 serializerFactory: $this->serializerFactory,
-            );
+            )->onDatabase($this->onDatabase);
         };
     }
 
@@ -354,7 +356,9 @@ final class InsertQueryBuilder implements BuildsQuery
             model: $hasOne->property->getType()->asClass(),
             rows: [$relation],
             serializerFactory: $this->serializerFactory,
-        )->execute();
+        )
+            ->onDatabase($this->onDatabase)
+            ->execute();
 
         $ownerModel = inspect($this->model->getName());
         $foreignKeyColumn = $hasOne->relationJoin ?? $this->removeTablePrefix($hasOne->ownerJoin);
@@ -392,7 +396,7 @@ final class InsertQueryBuilder implements BuildsQuery
             model: $hasOne->property->getType()->asClass(),
             rows: [$preparedData],
             serializerFactory: $this->serializerFactory,
-        );
+        )->onDatabase($this->onDatabase);
 
         return $relatedModelQuery->execute();
     }
@@ -511,7 +515,9 @@ final class InsertQueryBuilder implements BuildsQuery
             model: $belongsTo->property->getType()->asClass(),
             rows: [$value],
             serializerFactory: $this->serializerFactory,
-        )->execute();
+        )
+            ->onDatabase($this->onDatabase)
+            ->execute();
 
         $entry[$belongsTo->getOwnerFieldName()] = $relatedId;
 
@@ -614,7 +620,9 @@ final class InsertQueryBuilder implements BuildsQuery
         $resolvedValue = match (true) {
             $value === null => null,
             isset($value->{$primaryKey}) => $value->{$primaryKey}->value,
-            default => new InsertQueryBuilder($value::class, [$value], $this->serializerFactory)->build(),
+            default => new InsertQueryBuilder($value::class, [$value], $this->serializerFactory)
+                ->onDatabase($this->onDatabase)
+                ->build(),
         };
 
         return [$column, $resolvedValue];

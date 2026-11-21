@@ -275,7 +275,9 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
                 model: $property->getType()->asClass(),
                 rows: [$value],
                 serializerFactory: $this->serializerFactory,
-            )->build(),
+            )
+                ->onDatabase($this->onDatabase)
+                ->build(),
             default => $value,
         };
 
@@ -408,7 +410,9 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
                         model: $targetModel->getName(),
                         rows: [$related],
                         serializerFactory: $this->serializerFactory,
-                    )->execute(),
+                    )
+                        ->onDatabase($this->onDatabase)
+                        ->execute(),
                 };
 
                 $pivotRows[] = [
@@ -425,7 +429,7 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
                 model: $pivotTable,
                 rows: $pivotRows,
                 serializerFactory: $this->serializerFactory,
-            );
+            )->onDatabase($this->onDatabase);
         };
     }
 
@@ -459,7 +463,7 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
                 model: $hasMany->property->getIterableType()->asClass(),
                 rows: $insert,
                 serializerFactory: $this->serializerFactory,
-            );
+            )->onDatabase($this->onDatabase);
         };
     }
 
@@ -500,6 +504,7 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
     {
         if ($hasOne->ownerJoin) {
             $this->deleteCustomHasOneRelation($hasOne, $parentId);
+
             return;
         }
 
@@ -535,9 +540,9 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
             ->execute();
 
         new UpdateQueryBuilder($ownerModel->getName(), [$foreignKeyColumn => null], $this->serializerFactory)
+            ->onDatabase($this->onDatabase)
             ->whereField($ownerModel->getPrimaryKey(), $parentId->value)
             ->build()
-            ->onDatabase($this->onDatabase)
             ->execute();
     }
 
@@ -563,7 +568,9 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
             model: $hasOne->property->getType()->asClass(),
             rows: [$relation],
             serializerFactory: $this->serializerFactory,
-        )->execute();
+        )
+            ->onDatabase($this->onDatabase)
+            ->execute();
 
         $ownerModel = inspect($this->model->getName());
         $this->ensureModelHasPrimaryKey($ownerModel, 'HasOne');
@@ -571,9 +578,9 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
         $foreignKeyColumn = $hasOne->relationJoin ?? $this->removeTablePrefix($hasOne->ownerJoin);
 
         new UpdateQueryBuilder($ownerModel->getName(), [$foreignKeyColumn => $relatedModelId->value], $this->serializerFactory)
+            ->onDatabase($this->onDatabase)
             ->whereField($ownerModel->getPrimaryKey(), $parentId->value)
             ->build()
-            ->onDatabase($this->onDatabase)
             ->execute();
 
         return null;
@@ -594,7 +601,9 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
             model: $hasOne->property->getType()->asClass(),
             rows: [$preparedData],
             serializerFactory: $this->serializerFactory,
-        )->execute();
+        )
+            ->onDatabase($this->onDatabase)
+            ->execute();
     }
 
     private function prepareRelationItem(object|array $item, string $foreignKey, PrimaryKey $parentId): array
