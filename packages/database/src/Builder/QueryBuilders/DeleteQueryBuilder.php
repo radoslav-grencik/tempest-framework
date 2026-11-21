@@ -119,7 +119,7 @@ final class DeleteQueryBuilder implements BuildsQuery, SupportsWhereStatements
 
     public function build(mixed ...$bindings): Query
     {
-        if ($this->model->isObjectModel() && is_object($this->model->instance) && $this->model->hasPrimaryKey()) {
+        if ($this->model->hasPrimaryKey() && is_object($this->model->instance)) {
             $primaryKeyValue = $this->model->getPrimaryKeyValue();
 
             if ($primaryKeyValue instanceof PrimaryKey) {

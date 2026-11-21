@@ -58,6 +58,22 @@ final class UuidPrimaryKeyTest extends FrameworkIntegrationTestCase
     }
 
     #[Test]
+    public function only_the_selected_uuid_key_is_generated(): void
+    {
+        $this->database->migrate(CreateMigrationsTable::class, CreateModelWithReplacementUuidTableMigration::class);
+
+        $mage = new DatabaseModelWithReplacementUuid(name: 'Fern', race: 'Human')->save();
+
+        $this->assertFalse(isset($mage->uuid));
+        $this->assertTrue(Random\is_uuid($mage->modelId->value));
+
+        $retrieved = DatabaseModelWithReplacementUuid::get($mage->modelId);
+
+        $this->assertInstanceOf(DatabaseModelWithReplacementUuid::class, $retrieved);
+        $this->assertSame($mage->modelId->value, $retrieved->modelId->value);
+    }
+
+    #[Test]
     public function uuid_primary_key_retrieval(): void
     {
         $this->database->migrate(CreateMigrationsTable::class, CreateModelWithUuidTableMigration::class);
@@ -247,7 +263,7 @@ final class UuidPrimaryKeyTest extends FrameworkIntegrationTestCase
 }
 
 #[Table('model')]
-final class DatabaseModelWithUuid
+class DatabaseModelWithUuid
 {
     use IsDatabaseModel;
 
@@ -270,6 +286,26 @@ final class ModelWithUuid
         public string $name,
         public string $race,
     ) {}
+}
+
+#[Table('model_with_replacement_uuid')]
+final class DatabaseModelWithReplacementUuid extends DatabaseModelWithUuid
+{
+    #[Uuid]
+    public PrimaryKey $modelId;
+}
+
+final class CreateModelWithReplacementUuidTableMigration implements MigratesUp
+{
+    public string $name = '002_create_model_with_replacement_uuid';
+
+    public function up(): QueryStatement
+    {
+        return CreateTableStatement::forModel(DatabaseModelWithReplacementUuid::class)
+            ->uuid(name: 'modelId')
+            ->text('name')
+            ->text('race');
+    }
 }
 
 final class CreateModelWithUuidTableMigration implements MigratesUp

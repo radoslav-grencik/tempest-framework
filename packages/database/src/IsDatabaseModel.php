@@ -22,7 +22,7 @@ use function Tempest\Support\str;
 
 trait IsDatabaseModel
 {
-    #[IsBindingValue, SkipValidation]
+    #[DefaultPrimaryKey, IsBindingValue, SkipValidation]
     public PrimaryKey $id;
 
     #[SkipValidation, Virtual]

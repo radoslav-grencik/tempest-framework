@@ -145,6 +145,8 @@ final class CountQueryBuilder implements BuildsQuery, SupportsWhereStatements
 
     public function build(mixed ...$bindings): Query
     {
+        $this->model->getPrimaryKeyProperty();
+
         if ($this->joins !== []) {
             $this->count->joins = arr($this->joins)
                 ->map(fn (JoinStatement|string $join) => $join instanceof JoinStatement ? $join : new JoinStatement($join));

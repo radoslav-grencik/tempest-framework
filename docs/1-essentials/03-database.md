@@ -464,9 +464,7 @@ final class CreateChaptersTable implements MigratesUp
 
 UUID columns use `CHAR(36)` on MySQL, `UUID` on PostgreSQL, and `TEXT` on SQLite, so foreign keys referencing UUID primary keys are type-compatible on every supported dialect.
 
-:::warning
-Currently, the [`IsDatabaseModel`](#the-is-database-model-trait) trait already provides a primary `$id` property. It is therefore not possible to use UUIDs alongside `IsDatabaseModel`.
-:::
+UUIDs also work with [`IsDatabaseModel`](#the-is-database-model-trait). Declare a custom `PrimaryKey` property with `#[Uuid]`, or redeclare `public PrimaryKey $id` with `#[Uuid]` to keep the column name `id`.
 
 ### Using unsigned integers as primary keys
 
@@ -741,6 +739,8 @@ The {b`#[Hidden]`} attribute also excludes properties from serialization. See th
 :::
 
 ### The `IsDatabaseModel` trait
+
+Tempest looks for a primary key starting with the model class, then its parents. A class can declare a single `PrimaryKey` property without using the trait. On the same class, that property takes precedence over the trait's default `$id`. If the class introduces only the trait's `$id`, it takes precedence over an inherited key. If the closest class with a key declares multiple candidates at the same priority, Tempest throws an exception instead of choosing one.
 
 The {b`Tempest\Database\IsDatabaseModel`} trait provides an active record pattern. This trait enables database interaction via static methods on the model class itself.
 

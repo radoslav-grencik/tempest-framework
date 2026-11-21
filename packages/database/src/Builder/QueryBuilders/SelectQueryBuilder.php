@@ -419,6 +419,8 @@ final class SelectQueryBuilder implements BuildsQuery, SupportsWhereStatements, 
 
     public function build(mixed ...$bindings): Query
     {
+        $this->model->getPrimaryKeyProperty();
+
         $select = clone $this->select;
 
         foreach ($this->joins as $join) {

@@ -6,7 +6,9 @@ use ReflectionException;
 use Tempest\Database\BelongsTo;
 use Tempest\Database\BelongsToMany;
 use Tempest\Database\Config\DatabaseConfig;
+use Tempest\Database\DefaultPrimaryKey;
 use Tempest\Database\Eager;
+use Tempest\Database\Exceptions\ModelHasAmbiguousPrimaryKey;
 use Tempest\Database\HasMany;
 use Tempest\Database\HasManyThrough;
 use Tempest\Database\HasOne;
@@ -144,6 +146,10 @@ final class ModelInspector
             $values = [];
 
             foreach ($this->reflector->getProperties() as $property) {
+                if ($property->getReflection()->isStatic() || $this->isShadowedPrimaryKey($property)) {
+                    continue;
+                }
+
                 if ($property->isVirtual()) {
                     continue;
                 }
@@ -486,7 +492,7 @@ final class ModelInspector
         $valueFields = arr();
 
         foreach ($this->reflector->getPublicProperties() as $property) {
-            if ($property->isVirtual()) {
+            if ($property->getReflection()->isStatic() || $property->isVirtual()) {
                 continue;
             }
 
@@ -495,6 +501,10 @@ final class ModelInspector
             }
 
             if ($this->isRelation($property->getName())) {
+                continue;
+            }
+
+            if ($this->isShadowedPrimaryKey($property)) {
                 continue;
             }
 
@@ -538,7 +548,12 @@ final class ModelInspector
         }
 
         foreach ($this->reflector->getPublicProperties() as $property) {
+            if ($property->getReflection()->isStatic()) {
+                continue;
+            }
+
             $relation = $this->getRelation($property->getName());
+
             if ($relation instanceof HasMany) {
                 continue;
             }
@@ -571,7 +586,7 @@ final class ModelInspector
                 continue;
             }
 
-            if ($property->getType()->equals(PrimaryKey::class)) {
+            if ($property->getName() === $primaryKey?->getName() || $this->isShadowedPrimaryKey($property)) {
                 continue;
             }
 
@@ -750,13 +765,100 @@ final class ModelInspector
             return null;
         }
 
-        $primaryKeys = arr($this->reflector->getProperties())
-            ->filter(fn (PropertyReflector $property) => $property->getType()->matches(PrimaryKey::class));
+        $keys = [];
 
-        return match ($primaryKeys->count()) {
-            0 => null,
-            default => $primaryKeys->first(),
-        };
+        foreach ($this->reflector->getProperties() as $property) {
+            if (! $this->isPrimaryKeyCandidate($property)) {
+                continue;
+            }
+
+            $class = $property->getReflection()->getDeclaringClass()->getName();
+            $keys[$class][] = $property;
+        }
+
+        $nullable = [];
+
+        for ($class = $this->reflector->getReflection(); $class !== false; $class = $class->getParentClass()) {
+            $local = $keys[$class->getName()] ?? [];
+            $required = array_filter($local, fn (PropertyReflector $property) => ! $property->isNullable());
+
+            if ($required !== []) {
+                $custom = array_filter($required, fn (PropertyReflector $property) => ! $property->hasAttribute(DefaultPrimaryKey::class));
+
+                return $this->requireSinglePrimaryKey($custom ?: $required);
+            }
+
+            $nullable = $nullable ?: $local;
+        }
+
+        return $nullable === [] ? null : $this->requireSinglePrimaryKey($nullable);
+    }
+
+    /** @param PropertyReflector[] $properties */
+    private function requireSinglePrimaryKey(array $properties): PropertyReflector
+    {
+        if (count($properties) > 1) {
+            $names = implode(', ', array_map(fn (PropertyReflector $property) => $property->getName(), $properties));
+
+            throw new ModelHasAmbiguousPrimaryKey("Model `{$this->getName()}` has ambiguous primary keys: {$names}.");
+        }
+
+        return array_first($properties);
+    }
+
+    private function isPrimaryKeyCandidate(PropertyReflector $property): bool
+    {
+        return (
+            $property->getType()->matches(PrimaryKey::class)
+            && ! $property->getReflection()->isStatic()
+            && ! $property->isVirtual()
+            && ! $property->hasAttribute(Virtual::class)
+        );
+    }
+
+    public function isShadowedPrimaryKey(PropertyReflector $property): bool
+    {
+        return $this->isPrimaryKeyCandidate($property) && $this->isShadowedPrimaryKeyName($property->getName());
+    }
+
+    public function isShadowedPrimaryKeyName(string $field): bool
+    {
+        return $this->memoize('shadowed-key:' . $field, function () use ($field) {
+            if (! $this->reflector?->hasProperty($field)) {
+                return false;
+            }
+
+            $property = $this->reflector->getProperty($field);
+            $selected = $this->getPrimaryKeyProperty();
+
+            if ($selected === null || $field === $selected->getName() || ! $this->isPrimaryKeyCandidate($property)) {
+                return false;
+            }
+
+            if (! $property->isNullable()) {
+                return true;
+            }
+
+            // An abstract base can declare foreign keys without defining a model of its own.
+            for ($parent = $this->reflector->getReflection()->getParentClass(); $parent !== false; $parent = $parent->getParentClass()) {
+                if ($parent->isAbstract() || ! $parent->hasProperty($field)) {
+                    continue;
+                }
+
+                try {
+                    $parentKey = self::forModel($parent->getName())->getPrimaryKey();
+                } catch (ModelHasAmbiguousPrimaryKey) {
+                    // An ambiguous parent cannot establish that this field was its key.
+                    continue;
+                }
+
+                if ($parentKey === $field) {
+                    return true;
+                }
+            }
+
+            return false;
+        });
     }
 
     public function getPrimaryKeyValue(): ?PrimaryKey
@@ -789,6 +891,6 @@ final class ModelInspector
 
     public function isUuidPrimaryKey(PropertyReflector $property): bool
     {
-        return $property->getType()->matches(PrimaryKey::class) && $property->hasAttribute(Uuid::class);
+        return $property->hasAttribute(Uuid::class) && $property->getName() === $this->getPrimaryKey();
     }
 }

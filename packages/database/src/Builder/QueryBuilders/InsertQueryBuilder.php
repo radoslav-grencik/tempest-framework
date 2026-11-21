@@ -133,6 +133,8 @@ final class InsertQueryBuilder implements BuildsQuery
 
     public function build(mixed ...$bindings): Query
     {
+        $primaryKeyColumn = $this->model->getPrimaryKey();
+
         foreach ($this->resolveData() as $data) {
             foreach ($data as $value) {
                 $bindings[] = $value;
@@ -144,7 +146,7 @@ final class InsertQueryBuilder implements BuildsQuery
         return new Query(
             sql: $this->insert,
             bindings: [...$this->bindings, ...$bindings],
-            primaryKeyColumn: $this->model->getPrimaryKey(),
+            primaryKeyColumn: $primaryKeyColumn,
         )->onDatabase($this->onDatabase);
     }
 
@@ -186,7 +188,7 @@ final class InsertQueryBuilder implements BuildsQuery
         $data = [];
 
         foreach ($reflection->getPublicProperties() as $property) {
-            if ($property->isUninitialized($object)) {
+            if ($property->getReflection()->isStatic() || $property->isUninitialized($object)) {
                 continue;
             }
 
@@ -441,6 +443,10 @@ final class InsertQueryBuilder implements BuildsQuery
         $entry = [];
 
         foreach ($model as $key => $value) {
+            if ($this->model->isShadowedPrimaryKeyName($key)) {
+                continue;
+            }
+
             if ($this->handleHasManyRelation($key, $value)) {
                 continue;
             }
@@ -521,11 +527,16 @@ final class InsertQueryBuilder implements BuildsQuery
     private function resolveObjectData(object $model): array
     {
         $definition = inspect($model);
+        $definition->getPrimaryKeyProperty();
         $modelClass = new ClassReflector($model);
         $entry = [];
 
         foreach ($modelClass->getPublicProperties() as $property) {
             $propertyName = $property->getName();
+
+            if ($property->getReflection()->isStatic() || $definition->isShadowedPrimaryKey($property)) {
+                continue;
+            }
 
             if (! $property->isInitialized($model)) {
                 if ($definition->isUuidPrimaryKey($property)) {

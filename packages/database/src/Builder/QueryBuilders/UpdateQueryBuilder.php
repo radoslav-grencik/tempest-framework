@@ -207,6 +207,8 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
 
     private function resolveValuesToUpdate(): ImmutableArray
     {
+        $this->model->getPrimaryKeyProperty();
+
         if ($this->hasRelationUpdates()) {
             $this->validateRelationUpdateConstraints();
         }
@@ -217,6 +219,10 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
 
         $values = [];
         foreach ($this->values as $column => $value) {
+            if ($this->model->isShadowedPrimaryKeyName($column)) {
+                continue;
+            }
+
             if ($this->handleRelationUpdate($column, $value)) {
                 continue;
             }
@@ -500,6 +506,7 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
     {
         if ($hasOne->ownerJoin) {
             $this->deleteCustomHasOneRelation($hasOne, $parentId);
+
             return;
         }
 
@@ -614,7 +621,7 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
         $reflection = new ClassReflector($object);
 
         foreach ($reflection->getPublicProperties() as $property) {
-            if ($property->hasAttribute(Virtual::class)) {
+            if ($property->getReflection()->isStatic() || $property->hasAttribute(Virtual::class)) {
                 continue;
             }
 

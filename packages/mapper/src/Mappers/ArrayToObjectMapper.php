@@ -54,7 +54,7 @@ final class ArrayToObjectMapper implements Mapper
         $unsetProperties = [];
 
         foreach ($targetClass->getPublicProperties() as $property) {
-            if ($property->isVirtual()) {
+            if ($property->getReflection()->isStatic() || $property->isVirtual()) {
                 continue;
             }
 
@@ -168,7 +168,7 @@ final class ArrayToObjectMapper implements Mapper
 
         $plans[$key] ??= array_filter(array_map(
             function (PropertyReflector $property): ?array {
-                if ($property->isVirtual()) {
+                if ($property->getReflection()->isStatic() || $property->isVirtual()) {
                     return null;
                 }
 
@@ -210,7 +210,7 @@ final class ArrayToObjectMapper implements Mapper
 
         $plans[$key] ??= array_filter(array_map(
             function (PropertyReflector $childProperty) use ($parent): ?array {
-                if ($childProperty->isVirtual()) {
+                if ($childProperty->getReflection()->isStatic() || $childProperty->isVirtual()) {
                     return null;
                 }
 
