@@ -84,9 +84,11 @@ final class SelectQueryBuilder implements BuildsQuery, SupportsWhereStatements, 
 
         $this->select = new SelectStatement(
             table: $this->model->getTableDefinition(),
-            fields: $fields ?? $this->model
+            fields: $fields?->map(fn (mixed $field) => is_string($field) && $this->model->getColumnName($field) !== $field
+                ? $this->model->getSelectField($field, $this->model->getTableName(), $this->model->getTableName())
+                : $field) ?? $this->model
                 ->getSelectFields()
-                ->map(fn (string $fieldName) => new FieldStatement("{$this->model->getTableName()}.{$fieldName}")->withAlias()),
+                ->map(fn (string $fieldName) => $this->model->getSelectField($fieldName, $this->model->getTableName(), $this->model->getTableName())),
         );
     }
 
@@ -261,7 +263,7 @@ final class SelectQueryBuilder implements BuildsQuery, SupportsWhereStatements, 
         }
 
         if (! str_contains($field, '.')) {
-            $field = $this->model->getTableName() . '.' . $field;
+            $field = $this->model->getTableName() . '.' . $this->model->getColumnName($field);
         }
 
         $this->select->orderBy[] = new OrderByStatement(field: $field, direction: $direction);
@@ -371,7 +373,7 @@ final class SelectQueryBuilder implements BuildsQuery, SupportsWhereStatements, 
             }
 
             $existingFields[] = $field;
-            $this->select->fields[] = new FieldStatement("{$tableName}.{$field}")->withAlias();
+            $this->select->fields[] = $this->model->getSelectField($field, $tableName, $tableName);
         }
 
         return $this;
@@ -469,6 +471,7 @@ final class SelectQueryBuilder implements BuildsQuery, SupportsWhereStatements, 
     private function aggregate(AggregateFunction $function, string $column): mixed
     {
         $key = str(string: $function->value)->lower()->toString();
+        $column = $this->model->getColumnName($column);
 
         $field = new FieldStatement(
             field: "{$function->value}(`{$column}`) AS `{$key}`",

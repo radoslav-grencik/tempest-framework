@@ -5,6 +5,7 @@ namespace Tempest\Database\Builder;
 use ReflectionException;
 use Tempest\Database\BelongsTo;
 use Tempest\Database\BelongsToMany;
+use Tempest\Database\Column;
 use Tempest\Database\Config\DatabaseConfig;
 use Tempest\Database\Eager;
 use Tempest\Database\HasMany;
@@ -12,6 +13,7 @@ use Tempest\Database\HasManyThrough;
 use Tempest\Database\HasOne;
 use Tempest\Database\HasOneThrough;
 use Tempest\Database\PrimaryKey;
+use Tempest\Database\QueryStatements\FieldStatement;
 use Tempest\Database\Relation;
 use Tempest\Database\Table;
 use Tempest\Database\Uuid;
@@ -121,8 +123,25 @@ final class ModelInspector
     {
         return $this->memoize('getFieldDefinition' . $field, fn () => new FieldDefinition(
             $this->getTableDefinition(),
-            $field,
+            $this->getColumnName($field),
         ));
+    }
+
+    public function getColumnName(string $property): string
+    {
+        return $this->memoize('column:' . $property, function () use ($property) {
+            if (! $this->reflector?->hasProperty($property)) {
+                return $property;
+            }
+
+            return $this->reflector->getProperty($property)->getAttribute(Column::class)->name ?? $property;
+        });
+    }
+
+    public function getSelectField(string $field, string $table, string $alias): FieldStatement
+    {
+        return new FieldStatement($table . '.' . $this->getColumnName($field))
+            ->withAlias($alias . '.' . $field);
     }
 
     public function getTableName(): string
@@ -498,6 +517,10 @@ final class ModelInspector
                 continue;
             }
 
+            if ($property->getType()->equals(PrimaryKey::class) && $property->getName() !== $this->getPrimaryKey()) {
+                continue;
+            }
+
             $valueFields[] = $property;
         }
 
@@ -732,6 +755,13 @@ final class ModelInspector
     public function getPrimaryKey(): ?string
     {
         return $this->getPrimaryKeyProperty()?->getName();
+    }
+
+    public function getPrimaryKeyColumn(): ?string
+    {
+        $property = $this->getPrimaryKeyProperty();
+
+        return $property?->getAttribute(Column::class)->name ?? $property?->getName();
     }
 
     public function hasPrimaryKey(): bool

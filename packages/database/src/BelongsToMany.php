@@ -60,7 +60,7 @@ final class BelongsToMany implements Relation
             ->map(map: fn (
                 $field,
             ) => new FieldStatement(
-                field: "{$this->getTableAlias(tableName: $targetModel->getTableName())}.{$field}",
+                field: "{$this->getTableAlias(tableName: $targetModel->getTableName())}.{$targetModel->getColumnName($field)}",
             )
                 ->withAlias(
                     alias: sprintf(
@@ -223,7 +223,7 @@ final class BelongsToMany implements Relation
             return $ownerJoin;
         }
 
-        $primaryKey = $ownerModel->getPrimaryKey();
+        $primaryKey = $ownerModel->getPrimaryKeyColumn();
 
         if ($primaryKey === null) {
             throw ModelDidNotHavePrimaryColumn::neededForRelation(
@@ -269,7 +269,7 @@ final class BelongsToMany implements Relation
             );
         }
 
-        $primaryKey = $ownerModel->getPrimaryKey();
+        $primaryKey = $ownerModel->getPrimaryKeyColumn();
 
         if ($primaryKey === null) {
             throw ModelDidNotHavePrimaryColumn::neededForRelation(
@@ -312,7 +312,7 @@ final class BelongsToMany implements Relation
             return $relatedOwnerJoin;
         }
 
-        $primaryKey = $targetModel->getPrimaryKey();
+        $primaryKey = $targetModel->getPrimaryKeyColumn();
 
         if ($primaryKey === null) {
             throw ModelDidNotHavePrimaryColumn::neededForRelation(
@@ -353,7 +353,7 @@ final class BelongsToMany implements Relation
             return $relatedRelationJoin;
         }
 
-        $primaryKey = $targetModel->getPrimaryKey();
+        $primaryKey = $targetModel->getPrimaryKeyColumn();
 
         if ($primaryKey === null) {
             throw ModelDidNotHavePrimaryColumn::neededForRelation(
@@ -375,12 +375,12 @@ final class BelongsToMany implements Relation
         $targetModel = inspect(model: $this->property->getIterableType()->asClass());
         $pivotTable = $this->resolvePivotTable(ownerModel: $ownerModel, targetModel: $targetModel);
 
-        $ownerPK = $ownerModel->getPrimaryKey();
+        $ownerPK = $ownerModel->getPrimaryKeyColumn();
         $ownerTable = $ownerModel->getTableName();
         $fk = $this->ownerJoin ?? str(string: $ownerTable)->singularizeLastWord()->append(suffix: "_{$ownerPK}");
 
         $targetTable = $targetModel->getTableName();
-        $targetPK = $targetModel->getPrimaryKey();
+        $targetPK = $targetModel->getPrimaryKeyColumn();
         $targetFK = $this->relatedOwnerJoin ?? str(string: $targetTable)->singularizeLastWord()->append(suffix: "_{$targetPK}");
 
         return new WhereExistsStatement(
@@ -408,9 +408,9 @@ final class BelongsToMany implements Relation
         $targetModel = inspect(model: $this->property->getIterableType()->asClass());
         $relatedClassName = $this->property->getIterableType()->getName();
         $ownerTable = $ownerModel->getTableName();
-        $ownerPK = $ownerModel->getPrimaryKey();
+        $ownerPK = $ownerModel->getPrimaryKeyColumn();
         $targetTable = $targetModel->getTableName();
-        $targetPK = $targetModel->getPrimaryKey();
+        $targetPK = $targetModel->getPrimaryKeyColumn();
 
         $pivotTable = $this->resolvePivotTable(ownerModel: $ownerModel, targetModel: $targetModel);
         $ownerFK = $this->ownerJoin ?? str(string: $ownerTable)->singularizeLastWord() . '_' . $ownerPK;

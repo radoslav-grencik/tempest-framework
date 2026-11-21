@@ -144,7 +144,7 @@ final class InsertQueryBuilder implements BuildsQuery
         return new Query(
             sql: $this->insert,
             bindings: [...$this->bindings, ...$bindings],
-            primaryKeyColumn: $this->model->getPrimaryKey(),
+            primaryKeyColumn: $this->model->getPrimaryKeyColumn(),
         )->onDatabase($this->onDatabase);
     }
 
@@ -177,7 +177,7 @@ final class InsertQueryBuilder implements BuildsQuery
 
     private function getDefaultForeignKeyName(): string
     {
-        return Intl\singularize($this->model->getTableName()) . '_' . $this->model->getPrimaryKey();
+        return Intl\singularize($this->model->getTableName()) . '_' . $this->model->getPrimaryKeyColumn();
     }
 
     private function convertObjectToArray(object $object, array $excludeProperties = []): array
@@ -305,7 +305,7 @@ final class InsertQueryBuilder implements BuildsQuery
 
             $ownerFk = $belongsToMany->ownerJoin
                 ? $this->removeTablePrefix(columnName: $belongsToMany->ownerJoin)
-                : Intl\singularize_last_word(value: $ownerModel->getTableName()) . '_' . $ownerModel->getPrimaryKey();
+                : Intl\singularize_last_word(value: $ownerModel->getTableName()) . '_' . $ownerModel->getPrimaryKeyColumn();
 
             $targetPk = $targetModel->getPrimaryKey();
 
@@ -315,7 +315,7 @@ final class InsertQueryBuilder implements BuildsQuery
 
             $targetFk = $belongsToMany->relatedOwnerJoin
                 ? $this->removeTablePrefix(columnName: $belongsToMany->relatedOwnerJoin)
-                : Intl\singularize_last_word(value: $targetModel->getTableName()) . '_' . $targetPk;
+                : Intl\singularize_last_word(value: $targetModel->getTableName()) . '_' . $targetModel->getPrimaryKeyColumn();
 
             $pivotRows = [];
 
@@ -363,7 +363,7 @@ final class InsertQueryBuilder implements BuildsQuery
             'UPDATE %s SET %s = ? WHERE %s = ?',
             $ownerModel->getTableName(),
             $foreignKeyColumn,
-            $ownerModel->getPrimaryKey(),
+            $ownerModel->getPrimaryKeyColumn(),
         );
 
         $query = new Query($updateQuery, [$relatedModelId->value, $parentId->value]);
@@ -382,7 +382,7 @@ final class InsertQueryBuilder implements BuildsQuery
 
         // TODO: we might need to bake this into the naming strategy class
         $foreignKeyProperty = Intl\singularize_last_word($ownerModel->getTableName());
-        $foreignKeyColumn = $foreignKeyProperty . '_' . $ownerModel->getPrimaryKey();
+        $foreignKeyColumn = $foreignKeyProperty . '_' . $ownerModel->getPrimaryKeyColumn();
 
         $preparedData = is_array($relation)
             ? [...$relation, ...[$foreignKeyColumn => $parentId->value]]
@@ -416,7 +416,7 @@ final class InsertQueryBuilder implements BuildsQuery
 
     private function resolveRowPrimaryKey(array $entry): ?PrimaryKey
     {
-        $primaryKey = $this->model->getPrimaryKey();
+        $primaryKey = $this->model->getPrimaryKeyColumn();
 
         if ($primaryKey === null || ! isset($entry[$primaryKey])) {
             return null;
@@ -453,10 +453,10 @@ final class InsertQueryBuilder implements BuildsQuery
                 continue;
             }
 
-            $entry[$key] = $this->serializeIterableValue($key, $value);
+            $entry[$this->model->getColumnName($key)] = $this->serializeIterableValue($key, $value);
         }
 
-        $primaryKey = $this->model->getPrimaryKey();
+        $primaryKey = $this->model->getPrimaryKeyColumn();
 
         if ($primaryKey !== null && $this->model->hasUuidPrimaryKey() && ! isset($entry[$primaryKey])) {
             return [$primaryKey => Random\uuid(), ...$entry];
@@ -531,7 +531,7 @@ final class InsertQueryBuilder implements BuildsQuery
                 if ($definition->isUuidPrimaryKey($property)) {
                     $uuid = new PrimaryKey(Random\uuid());
                     $property->setValue($model, $uuid);
-                    $entry[$propertyName] = $this->serializeValue($property, $uuid);
+                    $entry[$definition->getColumnName($propertyName)] = $this->serializeValue($property, $uuid);
                 }
 
                 continue;
@@ -579,7 +579,7 @@ final class InsertQueryBuilder implements BuildsQuery
                 continue;
             }
 
-            $column = $propertyName;
+            $column = $definition->getColumnName($propertyName);
 
             if ($property->getType()->getName() === PrimaryKey::class && $value === null) {
                 continue;
@@ -609,7 +609,7 @@ final class InsertQueryBuilder implements BuildsQuery
         $belongsTo = $definition->getBelongsTo($property->getName());
         $column = $belongsTo instanceof BelongsTo
             ? $belongsTo->getOwnerFieldName()
-            : $property->getName() . '_' . $primaryKey;
+            : $property->getName() . '_' . $relationModel->getPrimaryKeyColumn();
 
         $resolvedValue = match (true) {
             $value === null => null,

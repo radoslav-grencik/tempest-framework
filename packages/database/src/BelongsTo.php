@@ -45,6 +45,10 @@ final class BelongsTo implements Relation
 
     public function getOwnerFieldName(): string
     {
+        if (($column = $this->property->getAttribute(Column::class)) !== null) {
+            return $column->name;
+        }
+
         if ($this->ownerJoin) {
             if (str_contains($this->ownerJoin, '.')) {
                 return explode('.', $this->ownerJoin)[1];
@@ -54,7 +58,7 @@ final class BelongsTo implements Relation
         }
 
         $relationModel = inspect($this->property->getType()->asClass());
-        $primaryKey = $relationModel->getPrimaryKey();
+        $primaryKey = $relationModel->getPrimaryKeyColumn();
 
         if ($primaryKey === null) {
             throw ModelDidNotHavePrimaryColumn::neededForRelation($relationModel->getName(), 'BelongsTo');
@@ -73,7 +77,7 @@ final class BelongsTo implements Relation
         return $relationModel
             ->getSelectFields()
             ->map(fn ($field) => new FieldStatement(
-                $tableReference . '.' . $field,
+                $tableReference . '.' . $relationModel->getColumnName($field),
             )
                 ->withAlias(
                     sprintf('%s.%s', $this->property->getName(), $field),
@@ -130,7 +134,7 @@ final class BelongsTo implements Relation
             );
         }
 
-        $primaryKey = $relationModel->getPrimaryKey();
+        $primaryKey = $relationModel->getPrimaryKeyColumn();
 
         if ($primaryKey === null) {
             throw ModelDidNotHavePrimaryColumn::neededForRelation($relationModel->getName(), 'BelongsTo');
@@ -146,7 +150,7 @@ final class BelongsTo implements Relation
 
         $relatedTable = $relatedModel->getTableName();
         $parentTable = $parentModel->getTableName();
-        $relatedPK = $relatedModel->getPrimaryKey();
+        $relatedPK = $relatedModel->getPrimaryKeyColumn();
         $fk = $this->getOwnerFieldName();
 
         return new WhereExistsStatement(
@@ -177,7 +181,7 @@ final class BelongsTo implements Relation
             $ownerJoin = sprintf('%s.%s', $ownerTable, $ownerJoin);
         }
 
-        if ($ownerJoin) {
+        if ($ownerJoin && ! $this->property->hasAttribute(Column::class)) {
             return $this->replaceTableReference(
                 qualifiedColumn: $ownerJoin,
                 originalTable: $ownerModel->getTableName(),
@@ -198,9 +202,9 @@ final class BelongsTo implements Relation
         $relatedModel = inspect(model: $this->property->getType()->asClass());
         $ownerModel = inspect(model: $this->property->getClass());
         $relatedTable = $relatedModel->getTableName();
-        $relatedPK = $relatedModel->getPrimaryKey();
+        $relatedPK = $relatedModel->getPrimaryKeyColumn();
         $ownerTable = $ownerModel->getTableName();
-        $ownerPK = $ownerModel->getPrimaryKey();
+        $ownerPK = $ownerModel->getPrimaryKeyColumn();
         $fk = $this->getOwnerFieldName();
 
         return query(model: $relatedClassName)

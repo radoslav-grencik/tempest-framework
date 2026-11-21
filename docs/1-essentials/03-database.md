@@ -542,6 +542,28 @@ return new SQLiteConfig(
 
 :::
 
+### Column names
+
+Use {b`#[Tempest\Database\Column]`} when a model property and its database column have different names:
+
+```php
+use Tempest\Database\Column;
+use Tempest\Database\IsDatabaseModel;
+
+final class Author
+{
+    use IsDatabaseModel;
+
+    #[Column('display_name')]
+    public string $displayName;
+}
+
+$author = Author::create(displayName: 'Ada');
+$author = Author::select()->whereField('displayName', 'Ada')->first();
+```
+
+The attribute also works on primary keys (including UUIDs) and on `BelongsTo` properties to name the foreign key on the owning table. Virtual properties and inverse relations such as `HasMany` don't have a column of their own. In migrations and raw SQL, use the database column name directly; the attribute does not change the database schema.
+
 ### Migration directories
 
 When `make:migration` asks where to save a PHP migration, you can choose a directory outside `app/` if it is registered in your `composer.json` under `autoload.psr-4`. For example, mapping `"Migrations\\": "migrations/"` lets you save `migrations/CreateBooksTable.php` with the namespace `Migrations`. Subdirectories use the corresponding nested namespace. Unregistered destinations are rejected.

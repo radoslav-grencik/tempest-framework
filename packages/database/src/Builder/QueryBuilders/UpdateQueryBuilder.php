@@ -181,7 +181,7 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
         $values = $this->resolveValuesToUpdate();
 
         if ($this->model->hasPrimaryKey()) {
-            unset($values[$this->model->getPrimaryKey()]);
+            unset($values[$this->model->getPrimaryKeyColumn()]);
         }
 
         $this->update->values = $values;
@@ -249,7 +249,7 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
 
         $value = $this->serializeValue($property, $value);
 
-        return [$column, $value];
+        return [$this->model->getColumnName($column), $value];
     }
 
     private function resolveRelationValue(PropertyReflector $property, string $column, mixed $value): array
@@ -265,7 +265,7 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
             $relationModel = inspect($property->getType()->asClass());
             $this->ensureModelHasPrimaryKey($relationModel, 'relation');
             $primaryKey = $relationModel->getPrimaryKey();
-            $column .= '_' . $primaryKey;
+            $column .= '_' . $relationModel->getPrimaryKeyColumn();
         }
 
         $resolvedValue = match (true) {
@@ -379,7 +379,7 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
 
             $ownerFk = $belongsToMany->ownerJoin
                 ? $this->removeTablePrefix(column: $belongsToMany->ownerJoin)
-                : Intl\singularize_last_word(value: $ownerModel->getTableName()) . '_' . $ownerModel->getPrimaryKey();
+                : Intl\singularize_last_word(value: $ownerModel->getTableName()) . '_' . $ownerModel->getPrimaryKeyColumn();
 
             $targetPk = $targetModel->getPrimaryKey();
 
@@ -389,7 +389,7 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
 
             $targetFk = $belongsToMany->relatedOwnerJoin
                 ? $this->removeTablePrefix(column: $belongsToMany->relatedOwnerJoin)
-                : Intl\singularize_last_word(value: $targetModel->getTableName()) . '_' . $targetPk;
+                : Intl\singularize_last_word(value: $targetModel->getTableName()) . '_' . $targetModel->getPrimaryKeyColumn();
 
             // Delete existing pivot rows
             new DeleteQueryBuilder(model: $pivotTable)
@@ -548,7 +548,7 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
 
         $this->ensureModelHasPrimaryKey($ownerModel, 'HasOne');
 
-        $foreignKeyColumn = Intl\singularize($ownerModel->getTableName()) . '_' . $ownerModel->getPrimaryKey();
+        $foreignKeyColumn = Intl\singularize($ownerModel->getTableName()) . '_' . $ownerModel->getPrimaryKeyColumn();
 
         new DeleteQueryBuilder($relatedModel->getName())
             ->whereField($foreignKeyColumn, $parentId->value)
@@ -584,7 +584,7 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
         $ownerModel = inspect($this->model->getName());
         $this->ensureModelHasPrimaryKey($ownerModel, 'HasOne');
 
-        $foreignKeyColumn = Intl\singularize($ownerModel->getTableName()) . '_' . $ownerModel->getPrimaryKey();
+        $foreignKeyColumn = Intl\singularize($ownerModel->getTableName()) . '_' . $ownerModel->getPrimaryKeyColumn();
 
         $preparedData = is_array($relation)
             ? [...$relation, $foreignKeyColumn => $parentId->value]
@@ -630,7 +630,7 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
     {
         $this->ensureModelHasPrimaryKey($this->model, 'relation');
 
-        return Intl\singularize($this->model->getTableName()) . '_' . $this->model->getPrimaryKey();
+        return Intl\singularize($this->model->getTableName()) . '_' . $this->model->getPrimaryKeyColumn();
     }
 
     private function removeTablePrefix(string $column): string
@@ -656,7 +656,7 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
 
         if (
             $this->model->hasPrimaryKey()
-            && $field === $this->model->getPrimaryKey()
+            && $this->model->getColumnName($field) === $this->model->getPrimaryKeyColumn()
             && $this->hasRelationUpdates()
             && ($operator === WhereOperator::EQUALS && (is_string($value) || is_int($value) || $value instanceof PrimaryKey))
         ) {

@@ -62,7 +62,7 @@ final class HasManyThrough implements Relation
             ->map(map: fn (
                 $field,
             ) => new FieldStatement(
-                field: "{$this->getTableAlias(tableName: $targetModel->getTableName())}.{$field}",
+                field: "{$this->getTableAlias(tableName: $targetModel->getTableName())}.{$targetModel->getColumnName($field)}",
             )
                 ->withAlias(
                     alias: sprintf(
@@ -196,7 +196,7 @@ final class HasManyThrough implements Relation
             return $ownerJoin;
         }
 
-        $primaryKey = $ownerModel->getPrimaryKey();
+        $primaryKey = $ownerModel->getPrimaryKeyColumn();
 
         if ($primaryKey === null) {
             throw ModelDidNotHavePrimaryColumn::neededForRelation(
@@ -239,7 +239,7 @@ final class HasManyThrough implements Relation
             );
         }
 
-        $primaryKey = $ownerModel->getPrimaryKey();
+        $primaryKey = $ownerModel->getPrimaryKeyColumn();
 
         if ($primaryKey === null) {
             throw ModelDidNotHavePrimaryColumn::neededForRelation(
@@ -280,7 +280,7 @@ final class HasManyThrough implements Relation
             return $throughOwnerJoin;
         }
 
-        $primaryKey = $intermediateModel->getPrimaryKey();
+        $primaryKey = $intermediateModel->getPrimaryKeyColumn();
 
         if ($primaryKey === null) {
             throw ModelDidNotHavePrimaryColumn::neededForRelation(
@@ -318,7 +318,7 @@ final class HasManyThrough implements Relation
             return $throughRelationJoin;
         }
 
-        $primaryKey = $intermediateModel->getPrimaryKey();
+        $primaryKey = $intermediateModel->getPrimaryKeyColumn();
 
         if ($primaryKey === null) {
             throw ModelDidNotHavePrimaryColumn::neededForRelation(
@@ -342,12 +342,12 @@ final class HasManyThrough implements Relation
 
         $intermediateTable = $intermediateModel->getTableName();
         $ownerTable = $ownerModel->getTableName();
-        $ownerPK = $ownerModel->getPrimaryKey();
+        $ownerPK = $ownerModel->getPrimaryKeyColumn();
 
         $fk = $this->ownerJoin ?? str(string: $ownerTable)->singularizeLastWord()->append(suffix: "_{$ownerPK}");
 
         $targetTable = $targetModel->getTableName();
-        $intermediatePK = $intermediateModel->getPrimaryKey();
+        $intermediatePK = $intermediateModel->getPrimaryKeyColumn();
         $targetFK = $this->throughOwnerJoin ?? str(string: $intermediateTable)->singularizeLastWord()->append(suffix: "_{$intermediatePK}");
 
         return new WhereExistsStatement(
@@ -376,8 +376,8 @@ final class HasManyThrough implements Relation
         $intermediateModel = inspect(model: $this->through);
         $intermediateTable = $intermediateModel->getTableName();
         $ownerTable = $ownerModel->getTableName();
-        $ownerPK = $ownerModel->getPrimaryKey();
-        $intermediatePK = $intermediateModel->getPrimaryKey();
+        $ownerPK = $ownerModel->getPrimaryKeyColumn();
+        $intermediatePK = $intermediateModel->getPrimaryKeyColumn();
         $relatedTable = inspect(model: $relatedClassName)->getTableName();
 
         $ownerFK = $this->ownerJoin ?? str(string: $ownerTable)->singularizeLastWord() . '_' . $ownerPK;

@@ -54,7 +54,7 @@ final class CountQueryBuilder implements BuildsQuery, SupportsWhereStatements
 
         $this->count = new CountStatement(
             table: $this->model->getTableDefinition(),
-            column: $column,
+            column: $column === null ? null : $this->model->getColumnName($column),
         );
     }
 

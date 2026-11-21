@@ -53,7 +53,7 @@ final class HasOne implements Relation
         return $relationModel
             ->getSelectFields()
             ->map(fn ($field) => new FieldStatement(
-                $tableReference . '.' . $field,
+                $tableReference . '.' . $relationModel->getColumnName($field),
             )
                 ->withAlias(
                     sprintf('%s.%s', $this->property->getName(), $field),
@@ -115,7 +115,7 @@ final class HasOne implements Relation
             );
         }
 
-        $primaryKey = $relationModel->getPrimaryKey();
+        $primaryKey = $relationModel->getPrimaryKeyColumn();
 
         if ($primaryKey === null) {
             throw ModelDidNotHavePrimaryColumn::neededForRelation($relationModel->getName(), 'HasOne');
@@ -135,7 +135,7 @@ final class HasOne implements Relation
 
         $relatedTable = $relatedModel->getTableName();
         $parentTable = $parentModel->getTableName();
-        $parentPK = $parentModel->getPrimaryKey();
+        $parentPK = $parentModel->getPrimaryKeyColumn();
         $fk = (string) ($this->ownerJoin ?? str(string: $parentTable)->singularizeLastWord()->append(suffix: "_{$parentPK}"));
 
         return new WhereExistsStatement(
@@ -178,7 +178,7 @@ final class HasOne implements Relation
             );
         }
 
-        $primaryKey = $relationModel->getPrimaryKey();
+        $primaryKey = $relationModel->getPrimaryKeyColumn();
 
         if ($primaryKey === null) {
             throw ModelDidNotHavePrimaryColumn::neededForRelation($relationModel->getName(), 'HasOne');
@@ -196,7 +196,7 @@ final class HasOne implements Relation
         $relatedClassName = $this->property->getType()->getName();
         $parentModel = inspect(model: $this->property->getClass());
         $parentTable = $parentModel->getTableName();
-        $parentPK = $parentModel->getPrimaryKey();
+        $parentPK = $parentModel->getPrimaryKeyColumn();
         $fk = $this->ownerJoin ?? str(string: $parentTable)->singularizeLastWord() . '_' . $parentPK;
 
         return query(model: $relatedClassName)
