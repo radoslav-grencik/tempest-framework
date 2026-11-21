@@ -24,7 +24,7 @@ final class BelongsToManyTest extends FrameworkIntegrationTestCase
             actual: $relation,
         );
         $this->assertSame(
-            expected: 'LEFT JOIN owner_target ON owner_target.owner_id = owner.id LEFT JOIN target ON target.id = owner_target.target_id',
+            expected: 'LEFT JOIN `owner_target` ON `owner_target`.`owner_id` = `owner`.`id` LEFT JOIN `target` ON `target`.`id` = `owner_target`.`target_id`',
             actual: $relation
                 ->getJoinStatement()
                 ->compile(dialect: DatabaseDialect::SQLITE),
@@ -40,11 +40,11 @@ final class BelongsToManyTest extends FrameworkIntegrationTestCase
         $fields = $relation->getSelectFields();
 
         $this->assertSame(
-            expected: 'target.id AS `targets.id`',
+            expected: '`target`.`id` AS `targets.id`',
             actual: $fields[0]->compile(DatabaseDialect::SQLITE),
         );
         $this->assertSame(
-            expected: 'target.data AS `targets.data`',
+            expected: '`target`.`data` AS `targets.data`',
             actual: $fields[1]->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -58,7 +58,7 @@ final class BelongsToManyTest extends FrameworkIntegrationTestCase
             ->setParent(name: 'parent');
 
         $this->assertSame(
-            expected: 'parent_targets.data AS `parent.targets.data`',
+            expected: '`parent_targets`.`data` AS `parent.targets.data`',
             actual: $relation->getSelectFields()[1]->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -72,7 +72,7 @@ final class BelongsToManyTest extends FrameworkIntegrationTestCase
             ->setParent(name: 'parent');
 
         $this->assertSame(
-            expected: 'LEFT JOIN owner_target ON owner_target.owner_id = owner.id LEFT JOIN target AS parent_targets ON parent_targets.id = owner_target.target_id',
+            expected: 'LEFT JOIN `owner_target` ON `owner_target`.`owner_id` = `owner`.`id` LEFT JOIN `target` AS `parent_targets` ON `parent_targets`.`id` = `owner_target`.`target_id`',
             actual: $relation
                 ->getJoinStatement()
                 ->compile(dialect: DatabaseDialect::SQLITE),
@@ -90,7 +90,7 @@ final class BelongsToManyTest extends FrameworkIntegrationTestCase
             actual: $relation,
         );
         $this->assertSame(
-            expected: 'LEFT JOIN custom_pivot ON custom_pivot.custom_owner_fk = custom_owner.custom_pk LEFT JOIN target ON target.id = custom_pivot.custom_target_fk',
+            expected: 'LEFT JOIN `custom_pivot` ON `custom_pivot`.`custom_owner_fk` = `custom_owner`.`custom_pk` LEFT JOIN `target` ON `target`.`id` = `custom_pivot`.`custom_target_fk`',
             actual: $relation
                 ->getJoinStatement()
                 ->compile(dialect: DatabaseDialect::SQLITE),

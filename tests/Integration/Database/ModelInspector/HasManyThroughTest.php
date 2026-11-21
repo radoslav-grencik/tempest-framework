@@ -25,7 +25,7 @@ final class HasManyThroughTest extends FrameworkIntegrationTestCase
         );
 
         $this->assertSame(
-            expected: 'LEFT JOIN intermediate ON intermediate.owner_id = owner.id LEFT JOIN target ON target.intermediate_id = intermediate.id',
+            expected: 'LEFT JOIN `intermediate` ON `intermediate`.`owner_id` = `owner`.`id` LEFT JOIN `target` ON `target`.`intermediate_id` = `intermediate`.`id`',
             actual: $relation
                 ->getJoinStatement()
                 ->compile(dialect: DatabaseDialect::SQLITE),
@@ -41,15 +41,15 @@ final class HasManyThroughTest extends FrameworkIntegrationTestCase
         $fields = $relation->getSelectFields();
 
         $this->assertSame(
-            expected: 'target.id AS `targets.id`',
+            expected: '`target`.`id` AS `targets.id`',
             actual: $fields[0]->compile(DatabaseDialect::SQLITE),
         );
         $this->assertSame(
-            expected: 'target.intermediate_id AS `targets.intermediate_id`',
+            expected: '`target`.`intermediate_id` AS `targets.intermediate_id`',
             actual: $fields[1]->compile(DatabaseDialect::SQLITE),
         );
         $this->assertSame(
-            expected: 'target.data AS `targets.data`',
+            expected: '`target`.`data` AS `targets.data`',
             actual: $fields[2]->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -63,7 +63,7 @@ final class HasManyThroughTest extends FrameworkIntegrationTestCase
             ->setParent(name: 'parent');
 
         $this->assertSame(
-            expected: 'parent_targets.data AS `parent.targets.data`',
+            expected: '`parent_targets`.`data` AS `parent.targets.data`',
             actual: $relation->getSelectFields()[2]->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -80,7 +80,7 @@ final class HasManyThroughTest extends FrameworkIntegrationTestCase
         );
 
         $this->assertSame(
-            expected: 'LEFT JOIN custom_intermediate ON custom_intermediate.custom_owner_fk = custom_owner.custom_pk LEFT JOIN target ON target.custom_intermediate_fk = custom_intermediate.custom_intermediate_pk',
+            expected: 'LEFT JOIN `custom_intermediate` ON `custom_intermediate`.`custom_owner_fk` = `custom_owner`.`custom_pk` LEFT JOIN `target` ON `target`.`custom_intermediate_fk` = `custom_intermediate`.`custom_intermediate_pk`',
             actual: $relation
                 ->getJoinStatement()
                 ->compile(dialect: DatabaseDialect::SQLITE),

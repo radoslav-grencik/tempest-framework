@@ -16,10 +16,27 @@ final class FieldStatement implements QueryStatement
 
     public function __construct(
         private readonly string|Stringable $field,
+        private readonly ?string $table = null,
     ) {}
 
     public function compile(DatabaseDialect $dialect): string
     {
+        if ($this->table !== null) {
+            $table = trim($this->table, '`"');
+            $field = $dialect->quoteIdentifier($table) . '.' . $dialect->quoteIdentifier((string) $this->field);
+            $alias = $this->alias === true ? $table . '.' . $this->field : $this->alias;
+
+            if (! $alias) {
+                return $field;
+            }
+
+            if ($this->aliasPrefix) {
+                $alias = $this->aliasPrefix . '.' . $alias;
+            }
+
+            return $field . ' AS ' . $dialect->quoteIdentifier($alias);
+        }
+
         $parts = explode(' AS ', str_replace(' as ', ' AS ', $this->field));
 
         $field = $parts[0];

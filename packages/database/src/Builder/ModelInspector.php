@@ -140,7 +140,7 @@ final class ModelInspector
 
     public function getSelectField(string $field, string $table, string $alias): FieldStatement
     {
-        return new FieldStatement($table . '.' . $this->getColumnName($field))
+        return new FieldStatement($this->getColumnName($field), table: $table)
             ->withAlias($alias . '.' . $field);
     }
 
@@ -599,7 +599,12 @@ final class ModelInspector
             }
 
             if ($relation instanceof BelongsTo) {
-                $selectFields[] = $relation->getOwnerFieldName();
+                $column = $relation->getOwnerFieldName();
+
+                // A physical foreign key must not take the alias of a mapped property.
+                if ($this->getColumnName($column) === $column) {
+                    $selectFields[] = $column;
+                }
             } else {
                 $selectFields[] = $property->getName();
             }

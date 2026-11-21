@@ -9,7 +9,6 @@ use Tempest\Database\Builder\ModelInspector;
 use Tempest\Database\Builder\QueryBuilders\QueryBuilder;
 use Tempest\Database\Builder\QueryBuilders\WhereRawScope;
 use Tempest\Database\Exceptions\ModelDidNotHavePrimaryColumn;
-use Tempest\Database\QueryStatements\FieldStatement;
 use Tempest\Database\QueryStatements\JoinStatement;
 use Tempest\Database\QueryStatements\WhereExistsStatement;
 use Tempest\Reflection\PropertyReflector;
@@ -57,17 +56,11 @@ final class BelongsToMany implements Relation
 
         return $targetModel
             ->getSelectFields()
-            ->map(map: fn (
-                $field,
-            ) => new FieldStatement(
-                field: "{$this->getTableAlias(tableName: $targetModel->getTableName())}.{$targetModel->getColumnName($field)}",
-            )
-                ->withAlias(
-                    alias: sprintf(
-                        '%s.%s',
-                        $this->property->getName(),
-                        $field,
-                    ),
+            ->map(map: fn ($field) => $targetModel
+                ->getSelectField(
+                    field: $field,
+                    table: $this->getTableAlias(tableName: $targetModel->getTableName()),
+                    alias: $this->property->getName(),
                 )
                 ->withAliasPrefix(prefix: $this->parent));
     }

@@ -84,9 +84,14 @@ final class SelectQueryBuilder implements BuildsQuery, SupportsWhereStatements, 
 
         $this->select = new SelectStatement(
             table: $this->model->getTableDefinition(),
-            fields: $fields?->map(fn (mixed $field) => is_string($field) && $this->model->getColumnName($field) !== $field
-                ? $this->model->getSelectField($field, $this->model->getTableName(), $this->model->getTableName())
-                : $field) ?? $this->model
+            fields: $fields?->flatMap(fn (mixed $field) => (
+                is_string($field) && preg_match('/^\s*\w+(?:\s*,\s*\w+)*\s*$/u', $field)
+                    ? array_map(trim(...), explode(',', $field))
+                    : [$field]
+            ))
+                ->map(fn (mixed $field) => is_string($field) && $this->model->getColumnName($field) !== $field
+                    ? $this->model->getSelectField($field, $this->model->getTableName(), $this->model->getTableName())
+                    : $field) ?? $this->model
                 ->getSelectFields()
                 ->map(fn (string $fieldName) => $this->model->getSelectField($fieldName, $this->model->getTableName(), $this->model->getTableName())),
         );

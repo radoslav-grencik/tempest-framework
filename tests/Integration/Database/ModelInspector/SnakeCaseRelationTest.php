@@ -26,7 +26,7 @@ final class SnakeCaseRelationTest extends FrameworkIntegrationTestCase
             actual: $relation,
         );
         $this->assertSame(
-            expected: 'LEFT JOIN author ON author.id = book.main_author_id',
+            expected: 'LEFT JOIN `author` ON `author`.`id` = `book`.`main_author_id`',
             actual: $relation
                 ->getJoinStatement()
                 ->compile(dialect: DatabaseDialect::SQLITE),
@@ -44,7 +44,7 @@ final class SnakeCaseRelationTest extends FrameworkIntegrationTestCase
             actual: $relation,
         );
         $this->assertSame(
-            expected: 'LEFT JOIN profile ON profile.author_id = author.id',
+            expected: 'LEFT JOIN `profile` ON `profile`.`author_id` = `author`.`id`',
             actual: $relation
                 ->getJoinStatement()
                 ->compile(dialect: DatabaseDialect::SQLITE),
@@ -62,7 +62,7 @@ final class SnakeCaseRelationTest extends FrameworkIntegrationTestCase
             actual: $relation,
         );
         $this->assertSame(
-            expected: 'LEFT JOIN book ON book.author_id = author.id',
+            expected: 'LEFT JOIN `book` ON `book`.`author_id` = `author`.`id`',
             actual: $relation
                 ->getJoinStatement()
                 ->compile(dialect: DatabaseDialect::SQLITE),

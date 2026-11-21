@@ -62,7 +62,6 @@ final readonly class WhereExistsStatement implements QueryStatement
 
         return match ($dialect) {
             DatabaseDialect::POSTGRESQL => str_replace('`', '"', $statement),
-            DatabaseDialect::SQLITE => str_replace('`', '', $statement),
             default => $statement,
         };
     }

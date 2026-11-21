@@ -70,7 +70,7 @@ final class BelongsToTest extends FrameworkIntegrationTestCase
         $this->assertInstanceOf(BelongsTo::class, $relation);
 
         $this->assertEquals(
-            'LEFT JOIN relation ON relation.id = owner.relation_id',
+            'LEFT JOIN `relation` ON `relation`.`id` = `owner`.`relation_id`',
             $relation->getJoinStatement()->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -84,7 +84,7 @@ final class BelongsToTest extends FrameworkIntegrationTestCase
         $this->assertInstanceOf(BelongsTo::class, $relation);
 
         $this->assertEquals(
-            'LEFT JOIN relation ON relation.overwritten_id = owner.relation_join_field_id',
+            'LEFT JOIN `relation` ON `relation`.`overwritten_id` = `owner`.`relation_join_field_id`',
             $relation->getJoinStatement()->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -98,7 +98,7 @@ final class BelongsToTest extends FrameworkIntegrationTestCase
         $this->assertInstanceOf(BelongsTo::class, $relation);
 
         $this->assertEquals(
-            'LEFT JOIN relation ON overwritten.overwritten_id = owner.relation_join_field_and_table_id',
+            'LEFT JOIN `relation` ON `overwritten`.`overwritten_id` = `owner`.`relation_join_field_and_table_id`',
             $relation->getJoinStatement()->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -112,7 +112,7 @@ final class BelongsToTest extends FrameworkIntegrationTestCase
         $this->assertInstanceOf(BelongsTo::class, $relation);
 
         $this->assertEquals(
-            'LEFT JOIN relation ON relation.id = owner.overwritten_id',
+            'LEFT JOIN `relation` ON `relation`.`id` = `owner`.`overwritten_id`',
             $relation->getJoinStatement()->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -126,7 +126,7 @@ final class BelongsToTest extends FrameworkIntegrationTestCase
         $this->assertInstanceOf(BelongsTo::class, $relation);
 
         $this->assertEquals(
-            'LEFT JOIN relation ON relation.id = overwritten.overwritten_id',
+            'LEFT JOIN `relation` ON `relation`.`id` = `overwritten`.`overwritten_id`',
             $relation->getJoinStatement()->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -138,7 +138,7 @@ final class BelongsToTest extends FrameworkIntegrationTestCase
         $relation = $model->getRelation('relation')->setParent('parent');
 
         $this->assertSame(
-            'parent_relation.name AS `parent.relation.name`',
+            '`parent_relation`.`name` AS `parent.relation.name`',
             $relation->getSelectFields()[1]->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -166,12 +166,12 @@ final class BelongsToTest extends FrameworkIntegrationTestCase
         $updatedByRelation = $model->getRelation('updatedBy')->setParent('')->withPropertyNameAlias();
 
         $this->assertEquals(
-            'LEFT JOIN users AS createdBy ON createdBy.id = roles.created_by',
+            'LEFT JOIN `users` AS `createdBy` ON `createdBy`.`id` = `roles`.`created_by`',
             $createdByRelation->getJoinStatement()->compile(DatabaseDialect::SQLITE),
         );
 
         $this->assertEquals(
-            'LEFT JOIN users AS updatedBy ON updatedBy.id = roles.updated_by',
+            'LEFT JOIN `users` AS `updatedBy` ON `updatedBy`.`id` = `roles`.`updated_by`',
             $updatedByRelation->getJoinStatement()->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -185,12 +185,12 @@ final class BelongsToTest extends FrameworkIntegrationTestCase
         $updatedByRelation = $model->getRelation('updated_by')->setParent('')->withPropertyNameAlias();
 
         $this->assertEquals(
-            'LEFT JOIN users AS created_by ON created_by.id = roles.created_by',
+            'LEFT JOIN `users` AS `created_by` ON `created_by`.`id` = `roles`.`created_by`',
             $createdByRelation->getJoinStatement()->compile(DatabaseDialect::SQLITE),
         );
 
         $this->assertEquals(
-            'LEFT JOIN users AS updated_by ON updated_by.id = roles.updated_by',
+            'LEFT JOIN `users` AS `updated_by` ON `updated_by`.`id` = `roles`.`updated_by`',
             $updatedByRelation->getJoinStatement()->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -204,12 +204,12 @@ final class BelongsToTest extends FrameworkIntegrationTestCase
         $updatedByFields = $model->getRelation('updatedBy')->setParent('')->withPropertyNameAlias()->getSelectFields();
 
         $this->assertSame(
-            'createdBy.id AS `createdBy.id`',
+            '`createdBy`.`id` AS `createdBy.id`',
             $createdByFields[0]->compile(DatabaseDialect::SQLITE),
         );
 
         $this->assertSame(
-            'updatedBy.id AS `updatedBy.id`',
+            '`updatedBy`.`id` AS `updatedBy.id`',
             $updatedByFields[0]->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -223,7 +223,7 @@ final class BelongsToTest extends FrameworkIntegrationTestCase
         $this->assertInstanceOf(BelongsTo::class, $relation);
 
         $this->assertEquals(
-            'LEFT JOIN categories AS parent ON parent.id = categories.parent_id',
+            'LEFT JOIN `categories` AS `parent` ON `parent`.`id` = `categories`.`parent_id`',
             $relation->getJoinStatement()->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -237,17 +237,17 @@ final class BelongsToTest extends FrameworkIntegrationTestCase
         $selectFields = $relation->getSelectFields();
 
         $this->assertSame(
-            'parent.id AS `parent.id`',
+            '`parent`.`id` AS `parent.id`',
             $selectFields[0]->compile(DatabaseDialect::SQLITE),
         );
 
         $this->assertSame(
-            'parent.parent_id AS `parent.parent_id`',
+            '`parent`.`parent_id` AS `parent.parent_id`',
             $selectFields[1]->compile(DatabaseDialect::SQLITE),
         );
 
         $this->assertSame(
-            'parent.name AS `parent.name`',
+            '`parent`.`name` AS `parent.name`',
             $selectFields[2]->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -259,7 +259,7 @@ final class BelongsToTest extends FrameworkIntegrationTestCase
         $relation = $model->getRelation('parentWithCustomOwnerJoin');
 
         $this->assertEquals(
-            'LEFT JOIN categories AS parentWithCustomOwnerJoin ON parentWithCustomOwnerJoin.id = categories.category_parent_id',
+            'LEFT JOIN `categories` AS `parentWithCustomOwnerJoin` ON `parentWithCustomOwnerJoin`.`id` = `categories`.`category_parent_id`',
             $relation->getJoinStatement()->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -273,7 +273,7 @@ final class BelongsToTest extends FrameworkIntegrationTestCase
         $this->assertInstanceOf(HasMany::class, $relation);
 
         $this->assertEquals(
-            'LEFT JOIN categories AS children ON children.parent_id = categories.id',
+            'LEFT JOIN `categories` AS `children` ON `children`.`parent_id` = `categories`.`id`',
             $relation->getJoinStatement()->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -287,12 +287,12 @@ final class BelongsToTest extends FrameworkIntegrationTestCase
         $selectFields = $relation->getSelectFields();
 
         $this->assertSame(
-            'children.id AS `children.id`',
+            '`children`.`id` AS `children.id`',
             $selectFields[0]->compile(DatabaseDialect::SQLITE),
         );
 
         $this->assertSame(
-            'children.parent_id AS `children.parent_id`',
+            '`children`.`parent_id` AS `children.parent_id`',
             $selectFields[1]->compile(DatabaseDialect::SQLITE),
         );
     }

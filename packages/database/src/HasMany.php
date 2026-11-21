@@ -7,9 +7,8 @@ namespace Tempest\Database;
 use Attribute;
 use Tempest\Database\Builder\ModelInspector;
 use Tempest\Database\Builder\QueryBuilders\QueryBuilder;
-use Tempest\Database\Builder\QueryBuilders\WhereFieldScope;
+use Tempest\Database\Builder\QueryBuilders\WhereRawScope;
 use Tempest\Database\Exceptions\ModelDidNotHavePrimaryColumn;
-use Tempest\Database\QueryStatements\FieldStatement;
 use Tempest\Database\QueryStatements\JoinStatement;
 use Tempest\Database\QueryStatements\WhereExistsStatement;
 use Tempest\Reflection\PropertyReflector;
@@ -52,13 +51,7 @@ final class HasMany implements Relation
 
         return $relationModel
             ->getSelectFields()
-            ->map(fn ($field) => new FieldStatement(
-                $tableReference . '.' . $relationModel->getColumnName($field),
-            )
-                ->withAlias(
-                    sprintf('%s.%s', $this->property->getName(), $field),
-                )
-                ->withAliasPrefix($this->parent));
+            ->map(fn ($field) => $relationModel->getSelectField($field, $tableReference, $this->property->getName())->withAliasPrefix($this->parent));
     }
 
     public function primaryKey(): string
@@ -189,7 +182,10 @@ final class HasMany implements Relation
 
         return query(model: $relatedClassName)
             ->onDatabase(databaseTag: $onDatabase)
-            ->scope(scope: new WhereFieldScope(field: $fk, value: $primaryKey));
+            ->scope(scope: new WhereRawScope(
+                statement: $this->qualifyIdentifier($fk, inspect($relatedClassName)->getTableName()) . ' = ?',
+                binding: $primaryKey,
+            ));
     }
 
     private function isSelfReferencing(): bool

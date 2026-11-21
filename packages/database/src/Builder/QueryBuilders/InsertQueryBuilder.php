@@ -72,6 +72,7 @@ final class InsertQueryBuilder implements BuildsQuery
         mixed $model,
         private readonly array $rows,
         private readonly SerializerFactory $serializerFactory,
+        private readonly array $columnValues = [],
     ) {
         $this->model = inspect($model);
         $this->insert = new InsertStatement($this->model->getTableDefinition());
@@ -180,7 +181,7 @@ final class InsertQueryBuilder implements BuildsQuery
         return Intl\singularize($this->model->getTableName()) . '_' . $this->model->getPrimaryKeyColumn();
     }
 
-    private function convertObjectToArray(object $object, array $excludeProperties = []): array
+    private function convertObjectToArray(object $object): array
     {
         $reflection = new ClassReflector($object);
         $data = [];
@@ -194,20 +195,21 @@ final class InsertQueryBuilder implements BuildsQuery
                 continue;
             }
 
+            if ($property->hasAttribute(Virtual::class)) {
+                continue;
+            }
+
             $propertyName = $property->getName();
 
-            if (! in_array($propertyName, $excludeProperties, strict: true)) {
-                $data[$propertyName] = $property->getValue($object);
-            }
+            $data[$propertyName] = $property->getValue($object);
         }
 
         return $data;
     }
 
-    private function prepareRelationItem(mixed $item, string $foreignKey, PrimaryKey $parentId): array
+    private function prepareRelationItem(mixed $item): array
     {
         if (is_array($item)) {
-            $item[$foreignKey] = $parentId;
             return $item;
         }
 
@@ -215,23 +217,7 @@ final class InsertQueryBuilder implements BuildsQuery
             return [];
         }
 
-        $foreignKeyProperty = str($foreignKey)->before('_')->toString();
-
-        if (property_exists($item, $foreignKey)) {
-            $item->{$foreignKey} = $parentId;
-            return $this->convertObjectToArray($item);
-        }
-
-        if (property_exists($item, $foreignKeyProperty)) {
-            $data = $this->convertObjectToArray($item, [$foreignKeyProperty]);
-            $data[$foreignKey] = $parentId;
-            return $data;
-        }
-
-        $data = $this->convertObjectToArray($item);
-        $data[$foreignKey] = $parentId;
-
-        return $data;
+        return $this->convertObjectToArray($item);
     }
 
     private function addHasManyRelationCallback(string $relationName, array $relations): void
@@ -253,7 +239,7 @@ final class InsertQueryBuilder implements BuildsQuery
 
             $insert = Arr\map(
                 array: $relations,
-                map: fn ($item) => $this->prepareRelationItem($item, $foreignKey, $parentId),
+                map: $this->prepareRelationItem(...),
             );
 
             if ($insert === []) {
@@ -264,6 +250,7 @@ final class InsertQueryBuilder implements BuildsQuery
                 model: $hasMany->property->getIterableType()->asClass(),
                 rows: $insert,
                 serializerFactory: $this->serializerFactory,
+                columnValues: [$foreignKey => $parentId->value],
             );
         };
     }
@@ -359,15 +346,11 @@ final class InsertQueryBuilder implements BuildsQuery
         $ownerModel = inspect($this->model->getName());
         $foreignKeyColumn = $hasOne->relationJoin ?? $this->removeTablePrefix($hasOne->ownerJoin);
 
-        $updateQuery = sprintf(
-            'UPDATE %s SET %s = ? WHERE %s = ?',
-            $ownerModel->getTableName(),
-            $foreignKeyColumn,
-            $ownerModel->getPrimaryKeyColumn(),
-        );
-
-        $query = new Query($updateQuery, [$relatedModelId->value, $parentId->value]);
-        $query->onDatabase($this->onDatabase)->execute();
+        new UpdateQueryBuilder($ownerModel->getTableName(), [$foreignKeyColumn => $relatedModelId->value], $this->serializerFactory)
+            ->whereField($ownerModel->getPrimaryKeyColumn(), $parentId->value)
+            ->build()
+            ->onDatabase($this->onDatabase)
+            ->execute();
 
         return null;
     }
@@ -385,13 +368,14 @@ final class InsertQueryBuilder implements BuildsQuery
         $foreignKeyColumn = $foreignKeyProperty . '_' . $ownerModel->getPrimaryKeyColumn();
 
         $preparedData = is_array($relation)
-            ? [...$relation, ...[$foreignKeyColumn => $parentId->value]]
-            : [...$this->convertObjectToArray($relation, [$foreignKeyProperty]), ...[$foreignKeyColumn => $parentId->value]];
+            ? $relation
+            : $this->convertObjectToArray($relation);
 
         $relatedModelQuery = new InsertQueryBuilder(
             model: $hasOne->property->getType()->asClass(),
             rows: [$preparedData],
             serializerFactory: $this->serializerFactory,
+            columnValues: [$foreignKeyColumn => $parentId->value],
         );
 
         return $relatedModelQuery->execute();
@@ -404,7 +388,7 @@ final class InsertQueryBuilder implements BuildsQuery
         foreach ($this->rows as $row) {
             $before = count($this->relationCallbacks);
 
-            $data = $this->resolveModelData($row);
+            $data = [...$this->resolveModelData($row), ...$this->columnValues];
 
             $resolved[] = $data;
             $this->resolvedRows[] = $data;
@@ -503,7 +487,15 @@ final class InsertQueryBuilder implements BuildsQuery
     {
         $belongsTo = $this->model->getBelongsTo($key);
 
-        if (! $belongsTo instanceof BelongsTo || ! is_object($value) && ! is_array($value)) {
+        if (! $belongsTo instanceof BelongsTo) {
+            return false;
+        }
+
+        if (array_key_exists($belongsTo->getOwnerFieldName(), $this->columnValues)) {
+            return true;
+        }
+
+        if (! is_object($value) && ! is_array($value)) {
             return false;
         }
 

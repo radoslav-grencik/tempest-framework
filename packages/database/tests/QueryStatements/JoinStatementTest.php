@@ -10,6 +10,25 @@ use Tempest\Database\QueryStatements\JoinStatement;
 final class JoinStatementTest extends TestCase
 {
     #[Test]
+    public function preserves_quoted_keyword_identifiers_for_each_dialect(): void
+    {
+        $join = new JoinStatement('LEFT JOIN `group` AS `related` ON `related`.`id` = `reviews`.`order`');
+
+        $this->assertSame(
+            'LEFT JOIN `group` AS `related` ON `related`.`id` = `reviews`.`order`',
+            $join->compile(DatabaseDialect::SQLITE),
+        );
+        $this->assertSame(
+            'LEFT JOIN `group` AS `related` ON `related`.`id` = `reviews`.`order`',
+            $join->compile(DatabaseDialect::MYSQL),
+        );
+        $this->assertSame(
+            'LEFT JOIN "group" AS "related" ON "related"."id" = "reviews"."order"',
+            $join->compile(DatabaseDialect::POSTGRESQL),
+        );
+    }
+
+    #[Test]
     public function inner_join_is_added_when_needed(): void
     {
         $this->assertSame(

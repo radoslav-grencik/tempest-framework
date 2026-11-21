@@ -7,6 +7,7 @@ namespace Tests\Tempest\Integration\Database;
 use PHPUnit\Framework\Attributes\Test;
 use Tempest\Database\Column;
 use Tempest\Database\HasMany;
+use Tempest\Database\HasOne;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\MigratesUp;
 use Tempest\Database\Migrations\CreateMigrationsTable;
@@ -31,8 +32,10 @@ final class ColumnTest extends FrameworkIntegrationTestCase
         ColumnAuthor::create(displayName: 'Ada');
 
         $this->assertSame('Ada', ColumnAuthor::select()->orderBy('displayName')->first()->displayName);
+
         $select = ColumnAuthor::select();
         $select->whereField('displayName', 'Zoe');
+
         $author = $select->first();
         $this->assertInstanceOf(ColumnAuthor::class, $author);
 
@@ -40,6 +43,7 @@ final class ColumnTest extends FrameworkIntegrationTestCase
         $author->save();
 
         $this->assertSame('Bea', ColumnAuthor::select()->get($author->authorId)->displayName);
+
         $author->displayName = 'Unsaved';
         $this->assertSame('Bea', $author->refresh()->displayName);
 
@@ -48,7 +52,7 @@ final class ColumnTest extends FrameworkIntegrationTestCase
     }
 
     #[Test]
-    public function renamed_keys_and_fields_work_in_eager_and_scoped_relations(): void
+    public function eager_and_scoped_relations_use_physical_columns_even_with_keywords_and_name_collisions(): void
     {
         $this->database->migrate(CreateMigrationsTable::class, ColumnAuthor::class, ColumnBook::class);
 
@@ -83,6 +87,158 @@ final class ColumnTest extends FrameworkIntegrationTestCase
         $this->assertSame(1, query(ColumnTag::class)->count('tagName')->execute());
         $this->assertSame('news', query(ColumnTag::class)->max('tagName'));
     }
+
+    #[Test]
+    public function renamed_properties_can_be_selected_as_a_comma_separated_list(): void
+    {
+        $this->database->migrate(CreateMigrationsTable::class, ColumnAuthor::class);
+
+        $author = ColumnAuthor::create(displayName: 'Ada');
+        $loaded = query(ColumnAuthor::class)->select('authorId, displayName')->get($author->authorId);
+
+        $this->assertSame($author->authorId->value, $loaded->authorId->value);
+        $this->assertSame('Ada', $loaded->displayName);
+
+        $single = query(ColumnAuthor::class)->select(' displayName ')->get($author->authorId);
+
+        $this->assertSame('Ada', $single->displayName);
+
+        $raw = query(ColumnAuthor::class)->select("'Ada, displayName, Lovelace' AS label")->build()->fetchFirst();
+
+        $this->assertSame('Ada, displayName, Lovelace', $raw['label']);
+    }
+
+    #[Test]
+    public function replacing_a_relation_preserves_other_owners_rows_when_names_overlap(): void
+    {
+        $this->database->migrate(CreateMigrationsTable::class, ColumnAuthor::class, ColumnBook::class);
+
+        $author = ColumnAuthor::create(displayName: 'Ada');
+        $other = ColumnAuthor::create(displayName: 'Bea');
+        $oldBook = ColumnBook::create(bookTitle: 'Old', author: $author);
+        $otherBook = ColumnBook::create(bookTitle: 'Keep', author: $other, writer_ref: $author->authorId->value);
+
+        $author->update(books: [['bookTitle' => 'New', 'writer_ref' => 42]]);
+
+        $this->assertSame('Keep', ColumnBook::select()->get($otherBook->bookId)?->bookTitle);
+        $this->assertNull(ColumnBook::select()->get($oldBook->bookId));
+
+        $replacement = ColumnAuthor::select()->with('books')->get($author->authorId)->books[0];
+        $this->assertSame('New', $replacement->bookTitle);
+        $this->assertSame(42, $replacement->writer_ref);
+    }
+
+    #[Test]
+    public function eagerly_loads_keyword_foreign_keys_in_both_directions_and_nested_relations(): void
+    {
+        $this->database->migrate(CreateMigrationsTable::class, ColumnAuthor::class, ColumnReview::class);
+
+        $author = ColumnAuthor::create(displayName: 'Ada');
+        $review = ColumnReview::create(author: $author);
+
+        $this->assertSame('Ada', ColumnReview::select()->with('author')->get($review->id)->author->displayName);
+
+        $loaded = ColumnAuthor::select()->with('reviews.author')->get($author->authorId);
+        $this->assertSame($review->id->value, $loaded->reviews[0]->id->value);
+        $this->assertSame('Ada', $loaded->reviews[0]->author->displayName);
+
+        $unassigned = ColumnReview::create(author: null);
+        $this->assertNull(ColumnReview::select()->with('author')->get($unassigned->id)->author);
+    }
+
+    #[Test]
+    public function scopes_and_updates_relations_with_keyword_foreign_keys(): void
+    {
+        $this->database->migrate(CreateMigrationsTable::class, ColumnAuthor::class, ColumnReview::class);
+
+        $author = ColumnAuthor::create(displayName: 'Ada');
+        $other = ColumnAuthor::create(displayName: 'Bea');
+        $review = ColumnReview::create(author: $author);
+
+        $this->assertSame($review->id->value, $author->query('reviews')->select()->first()->id->value);
+        $this->assertSame('Ada', $review->query('author')->select()->first()->displayName);
+        $this->assertNull($other->query('reviews')->select()->first());
+
+        $review->update(author: $other);
+
+        $this->assertNull($author->query('reviews')->select()->first());
+        $this->assertSame('Bea', $review->query('author')->select()->first()->displayName);
+    }
+
+    #[Test]
+    public function filters_relation_existence_using_keyword_foreign_keys(): void
+    {
+        $this->database->migrate(CreateMigrationsTable::class, ColumnAuthor::class, ColumnReview::class);
+
+        $author = ColumnAuthor::create(displayName: 'Ada');
+        $other = ColumnAuthor::create(displayName: 'Bea');
+        $review = ColumnReview::create(author: $author);
+        $unassigned = ColumnReview::create(author: null);
+
+        $this->assertSame($author->authorId->value, ColumnAuthor::select()->whereHas('reviews')->first()->authorId->value);
+        $this->assertSame($other->authorId->value, ColumnAuthor::select()->whereDoesntHave('reviews')->first()->authorId->value);
+        $this->assertSame($review->id->value, ColumnReview::select()->whereHas('author')->first()->id->value);
+        $this->assertSame($unassigned->id->value, ColumnReview::select()->whereDoesntHave('author')->first()->id->value);
+        $this->assertNull(ColumnAuthor::select()->whereHas('reviews', count: 2)->first());
+    }
+
+    #[Test]
+    public function nested_inserts_preserve_properties_that_overlap_physical_foreign_keys_and_their_prefixes(): void
+    {
+        $this->database->migrate(CreateMigrationsTable::class, ColumnAuthor::class, ColumnBook::class);
+
+        $child = ColumnBook::new(bookTitle: 'First', writer_ref: 42, writer: 'Keep this value');
+        $author = ColumnAuthor::create(displayName: 'Ada', books: [$child]);
+        $book = $author->query('books')->select()->with('author')->first();
+
+        $this->assertSame(42, $book->writer_ref);
+        $this->assertSame('Keep this value', $book->writer);
+        $this->assertSame($author->authorId->value, $book->author->authorId->value);
+        $this->assertSame(1, query(ColumnAuthor::class)->count()->execute());
+    }
+
+    #[Test]
+    public function replacing_keyword_relations_preserves_other_owners_and_accepts_an_empty_list(): void
+    {
+        $this->database->migrate(CreateMigrationsTable::class, ColumnAuthor::class, ColumnReview::class);
+
+        $author = ColumnAuthor::create(displayName: 'Ada', reviews: [[]]);
+        $other = ColumnAuthor::create(displayName: 'Bea', reviews: [[]]);
+        $oldReview = $author->query('reviews')->select()->first();
+        $otherReview = $other->query('reviews')->select()->first();
+
+        $author->update(reviews: [[]]);
+
+        $this->assertNull(ColumnReview::select()->get($oldReview->id));
+        $this->assertCount(1, $author->query('reviews')->select()->all());
+
+        $author->update(reviews: []);
+
+        $this->assertNull($author->query('reviews')->select()->first());
+        $this->assertInstanceOf(ColumnReview::class, ColumnReview::select()->get($otherReview->id));
+    }
+
+    #[Test]
+    public function inserting_and_replacing_a_custom_has_one_uses_physical_foreign_and_keyword_primary_keys(): void
+    {
+        $this->database->migrate(CreateMigrationsTable::class, ColumnAuthor::class, ColumnAccount::class);
+
+        $account = ColumnAccount::create(author: ['displayName' => 'Ada']);
+        $author = ColumnAccount::select()->with('author')->get($account->accountId)->author;
+
+        $this->assertSame('Ada', $author->displayName);
+
+        query(ColumnAccount::class)
+            ->update(author: ['displayName' => 'Bea'])
+            ->whereField('accountId', $account->accountId)
+            ->execute();
+
+        $loaded = ColumnAccount::select()->with('author')->get($account->accountId);
+
+        $this->assertSame('Bea', $loaded->author->displayName);
+        $this->assertSame($loaded->author->authorId->value, $loaded->authorId);
+        $this->assertNull(ColumnAuthor::get($author->authorId));
+    }
 }
 
 #[Table('column_authors')]
@@ -103,6 +259,10 @@ final class ColumnAuthor implements MigratesUp
     #[HasMany(ownerJoin: 'writer_ref')]
     public array $books = [];
 
+    /** @var \Tests\Tempest\Integration\Database\ColumnReview[] */
+    #[HasMany(ownerJoin: 'order')]
+    public array $reviews = [];
+
     public function up(): QueryStatement
     {
         return new CreateTableStatement('column_authors')
@@ -122,18 +282,44 @@ final class ColumnBook implements MigratesUp
     #[Column('book_id')]
     public PrimaryKey $bookId;
 
-    #[Column('book_title')]
+    #[Column('order')]
     public string $bookTitle;
 
     #[Column('writer_ref')]
     public ColumnAuthor $author;
 
+    #[Column('legacy_code')]
+    public int $writer_ref = 0;
+
+    public string $writer = '';
+
     public function up(): QueryStatement
     {
         return new CreateTableStatement('column_books')
             ->primary('book_id')
-            ->string('book_title')
-            ->integer('writer_ref');
+            ->string('order')
+            ->integer('writer_ref')
+            ->integer('legacy_code')
+            ->string('writer', default: '');
+    }
+}
+
+#[Table('column_reviews')]
+final class ColumnReview implements MigratesUp
+{
+    use IsDatabaseModel;
+
+    #[Virtual]
+    public string $name = 'column_reviews';
+
+    #[Column('order')]
+    public ?ColumnAuthor $author = null;
+
+    public function up(): QueryStatement
+    {
+        return new CreateTableStatement('column_reviews')
+            ->primary('id')
+            ->integer('order', nullable: true);
     }
 }
 
@@ -157,5 +343,30 @@ final class ColumnTag implements MigratesUp
         return new CreateTableStatement('column_tags')
             ->uuid('tag_id')
             ->string('tag_name');
+    }
+}
+
+#[Table('column_accounts')]
+final class ColumnAccount implements MigratesUp
+{
+    use IsDatabaseModel;
+
+    #[Virtual]
+    public string $name = 'column_accounts';
+
+    #[Column('order')]
+    public PrimaryKey $accountId;
+
+    #[Column('author_ref')]
+    public ?int $authorId = null;
+
+    #[HasOne(ownerJoin: 'author_id', relationJoin: 'author_ref')]
+    public ColumnAuthor $author;
+
+    public function up(): QueryStatement
+    {
+        return new CreateTableStatement('column_accounts')
+            ->primary('order')
+            ->integer('author_ref', nullable: true);
     }
 }

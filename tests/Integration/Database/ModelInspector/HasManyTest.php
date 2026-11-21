@@ -23,7 +23,7 @@ final class HasManyTest extends FrameworkIntegrationTestCase
 
         $this->assertInstanceOf(HasMany::class, $relation);
         $this->assertSame(
-            'LEFT JOIN owner ON owner.relation_id = relation.id',
+            'LEFT JOIN `owner` ON `owner`.`relation_id` = `relation`.`id`',
             $relation->getJoinStatement()->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -36,7 +36,7 @@ final class HasManyTest extends FrameworkIntegrationTestCase
 
         $this->assertInstanceOf(HasMany::class, $relation);
         $this->assertSame(
-            'LEFT JOIN owner ON owner.overwritten_id = relation.id',
+            'LEFT JOIN `owner` ON `owner`.`overwritten_id` = `relation`.`id`',
             $relation->getJoinStatement()->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -49,7 +49,7 @@ final class HasManyTest extends FrameworkIntegrationTestCase
 
         $this->assertInstanceOf(HasMany::class, $relation);
         $this->assertSame(
-            'LEFT JOIN owner ON overwritten.overwritten_id = relation.id',
+            'LEFT JOIN `owner` ON `overwritten`.`overwritten_id` = `relation`.`id`',
             $relation->getJoinStatement()->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -62,7 +62,7 @@ final class HasManyTest extends FrameworkIntegrationTestCase
 
         $this->assertInstanceOf(HasMany::class, $relation);
         $this->assertSame(
-            'LEFT JOIN owner ON owner.relation_id = relation.overwritten_id',
+            'LEFT JOIN `owner` ON `owner`.`relation_id` = `relation`.`overwritten_id`',
             $relation->getJoinStatement()->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -75,7 +75,7 @@ final class HasManyTest extends FrameworkIntegrationTestCase
 
         $this->assertInstanceOf(HasMany::class, $relation);
         $this->assertSame(
-            'LEFT JOIN owner ON owner.relation_id = overwritten.overwritten_id',
+            'LEFT JOIN `owner` ON `owner`.`relation_id` = `overwritten`.`overwritten_id`',
             $relation->getJoinStatement()->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -87,7 +87,7 @@ final class HasManyTest extends FrameworkIntegrationTestCase
         $relation = $model->getRelation('owners')->setParent('parent');
 
         $this->assertSame(
-            'parent_owners.relation_id AS `parent.owners.relation_id`',
+            '`parent_owners`.`relation_id` AS `parent.owners.relation_id`',
             $relation->getSelectFields()[1]->compile(DatabaseDialect::SQLITE),
         );
     }

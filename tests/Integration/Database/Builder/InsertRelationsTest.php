@@ -100,6 +100,21 @@ final class InsertRelationsTest extends FrameworkIntegrationTestCase
     }
 
     #[Test]
+    public function inserting_has_many_with_a_null_inverse_relation_uses_the_parent_key(): void
+    {
+        $this->database->migrate(CreateMigrationsTable::class, CreateMageTable::class, CreateSpellTable::class);
+
+        $mage = new Mage(name: 'Frieren', element: 'Time');
+        $mage->spells = [new Spell(name: 'Zoltraak', type: 'Offensive')];
+
+        $id = query(Mage::class)->insert($mage)->execute();
+        $spell = Spell::select()->with('creator')->first();
+
+        $this->assertSame('Zoltraak', $spell->name);
+        $this->assertSame($id->value, $spell->creator->mage_uuid->value);
+    }
+
+    #[Test]
     public function inserting_has_one_with_object(): void
     {
         $this->database->migrate(
@@ -181,6 +196,7 @@ final class InsertRelationsTest extends FrameworkIntegrationTestCase
         $this->database->migrate(CreateMigrationsTable::class, CreatePublishersTable::class, CreateAuthorTable::class, CreateBookTable::class, CreateChapterTable::class);
 
         $chapters = [];
+
         for ($i = 1; $i <= 10; $i++) {
             $chapters[] = ['title' => "Chapter {$i}"];
         }

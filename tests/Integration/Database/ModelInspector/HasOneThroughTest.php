@@ -21,7 +21,7 @@ final class HasOneThroughTest extends FrameworkIntegrationTestCase
 
         $this->assertInstanceOf(expected: HasOneThrough::class, actual: $relation);
         $this->assertSame(
-            expected: 'LEFT JOIN intermediate ON intermediate.owner_id = owner.id LEFT JOIN target ON target.intermediate_id = intermediate.id',
+            expected: 'LEFT JOIN `intermediate` ON `intermediate`.`owner_id` = `owner`.`id` LEFT JOIN `target` ON `target`.`intermediate_id` = `intermediate`.`id`',
             actual: $relation
                 ->getJoinStatement()
                 ->compile(dialect: DatabaseDialect::SQLITE),
@@ -37,15 +37,15 @@ final class HasOneThroughTest extends FrameworkIntegrationTestCase
         $fields = $relation->getSelectFields();
 
         $this->assertSame(
-            expected: 'target.id AS `target.id`',
+            expected: '`target`.`id` AS `target.id`',
             actual: $fields[0]->compile(DatabaseDialect::SQLITE),
         );
         $this->assertSame(
-            expected: 'target.intermediate_id AS `target.intermediate_id`',
+            expected: '`target`.`intermediate_id` AS `target.intermediate_id`',
             actual: $fields[1]->compile(DatabaseDialect::SQLITE),
         );
         $this->assertSame(
-            expected: 'target.data AS `target.data`',
+            expected: '`target`.`data` AS `target.data`',
             actual: $fields[2]->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -59,7 +59,7 @@ final class HasOneThroughTest extends FrameworkIntegrationTestCase
             ->setParent(name: 'parent');
 
         $this->assertSame(
-            expected: 'parent_target.data AS `parent.target.data`',
+            expected: '`parent_target`.`data` AS `parent.target.data`',
             actual: $relation->getSelectFields()[2]->compile(DatabaseDialect::SQLITE),
         );
     }
@@ -72,7 +72,7 @@ final class HasOneThroughTest extends FrameworkIntegrationTestCase
 
         $this->assertInstanceOf(expected: HasOneThrough::class, actual: $relation);
         $this->assertSame(
-            expected: 'LEFT JOIN custom_intermediate ON custom_intermediate.custom_owner_fk = custom_owner.custom_pk LEFT JOIN target ON target.custom_intermediate_fk = custom_intermediate.custom_intermediate_pk',
+            expected: 'LEFT JOIN `custom_intermediate` ON `custom_intermediate`.`custom_owner_fk` = `custom_owner`.`custom_pk` LEFT JOIN `target` ON `target`.`custom_intermediate_fk` = `custom_intermediate`.`custom_intermediate_pk`',
             actual: $relation
                 ->getJoinStatement()
                 ->compile(dialect: DatabaseDialect::SQLITE),

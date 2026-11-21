@@ -19,6 +19,7 @@ use Tempest\Database\HasOneThrough;
 use Tempest\Database\OnDatabase;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Query;
+use Tempest\Database\QueryStatements\FieldStatement;
 use Tempest\Database\QueryStatements\UpdateStatement;
 use Tempest\Database\QueryStatements\WhereStatement;
 use Tempest\Database\Virtual;
@@ -216,6 +217,7 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
         }
 
         $values = [];
+
         foreach ($this->values as $column => $value) {
             if ($this->handleRelationUpdate($column, $value)) {
                 continue;
@@ -447,8 +449,9 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
                 : $this->getDefaultForeignKeyName();
 
             $insert = [];
+
             foreach ($relations as $item) {
-                $insert[] = $this->prepareRelationItem($item, $foreignKey, $parentId);
+                $insert[] = is_array($item) ? $item : $this->convertObjectToArray($item);
             }
 
             if ($insert === []) {
@@ -459,6 +462,7 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
                 model: $hasMany->property->getIterableType()->asClass(),
                 rows: $insert,
                 serializerFactory: $this->serializerFactory,
+                columnValues: [$foreignKey => $parentId->value],
             );
         };
     }
@@ -489,7 +493,7 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
             ? $this->removeTablePrefix($hasMany->ownerJoin)
             : $this->getDefaultForeignKeyName();
 
-        new DeleteQueryBuilder($relatedModel->getName())
+        new DeleteQueryBuilder($relatedModel->getTableName())
             ->whereField($foreignKey, $parentId->value)
             ->build()
             ->onDatabase($this->onDatabase)
@@ -500,6 +504,7 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
     {
         if ($hasOne->ownerJoin) {
             $this->deleteCustomHasOneRelation($hasOne, $parentId);
+
             return;
         }
 
@@ -516,8 +521,10 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
 
         $foreignKeyColumn = $hasOne->relationJoin ?? $this->removeTablePrefix($hasOne->ownerJoin);
 
-        $result = new SelectQueryBuilder($ownerModel->getName(), new ImmutableArray([$foreignKeyColumn]))
-            ->whereField($ownerModel->getPrimaryKey(), $parentId->value)
+        $result = new SelectQueryBuilder($ownerModel->getTableName(), new ImmutableArray([
+            new FieldStatement($foreignKeyColumn, table: $ownerModel->getTableName()),
+        ]))
+            ->whereField($ownerModel->getPrimaryKeyColumn(), $parentId->value)
             ->build()
             ->onDatabase($this->onDatabase)
             ->fetchFirst();
@@ -534,8 +541,8 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
             ->onDatabase($this->onDatabase)
             ->execute();
 
-        new UpdateQueryBuilder($ownerModel->getName(), [$foreignKeyColumn => null], $this->serializerFactory)
-            ->whereField($ownerModel->getPrimaryKey(), $parentId->value)
+        new UpdateQueryBuilder($ownerModel->getTableName(), [$foreignKeyColumn => null], $this->serializerFactory)
+            ->whereField($ownerModel->getPrimaryKeyColumn(), $parentId->value)
             ->build()
             ->onDatabase($this->onDatabase)
             ->execute();
@@ -550,7 +557,7 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
 
         $foreignKeyColumn = Intl\singularize($ownerModel->getTableName()) . '_' . $ownerModel->getPrimaryKeyColumn();
 
-        new DeleteQueryBuilder($relatedModel->getName())
+        new DeleteQueryBuilder($relatedModel->getTableName())
             ->whereField($foreignKeyColumn, $parentId->value)
             ->build()
             ->onDatabase($this->onDatabase)
@@ -570,8 +577,8 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
 
         $foreignKeyColumn = $hasOne->relationJoin ?? $this->removeTablePrefix($hasOne->ownerJoin);
 
-        new UpdateQueryBuilder($ownerModel->getName(), [$foreignKeyColumn => $relatedModelId->value], $this->serializerFactory)
-            ->whereField($ownerModel->getPrimaryKey(), $parentId->value)
+        new UpdateQueryBuilder($ownerModel->getTableName(), [$foreignKeyColumn => $relatedModelId->value], $this->serializerFactory)
+            ->whereField($ownerModel->getPrimaryKeyColumn(), $parentId->value)
             ->build()
             ->onDatabase($this->onDatabase)
             ->execute();
@@ -586,26 +593,12 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
 
         $foreignKeyColumn = Intl\singularize($ownerModel->getTableName()) . '_' . $ownerModel->getPrimaryKeyColumn();
 
-        $preparedData = is_array($relation)
-            ? [...$relation, $foreignKeyColumn => $parentId->value]
-            : [...$this->convertObjectToArray($relation), $foreignKeyColumn => $parentId->value];
-
         return new InsertQueryBuilder(
             model: $hasOne->property->getType()->asClass(),
-            rows: [$preparedData],
+            rows: [is_array($relation) ? $relation : $this->convertObjectToArray($relation)],
             serializerFactory: $this->serializerFactory,
+            columnValues: [$foreignKeyColumn => $parentId->value],
         )->execute();
-    }
-
-    private function prepareRelationItem(object|array $item, string $foreignKey, PrimaryKey $parentId): array
-    {
-        $preparedData = is_array($item)
-            ? $item
-            : $this->convertObjectToArray($item);
-
-        $preparedData[$foreignKey] = $parentId->value;
-
-        return $preparedData;
     }
 
     private function convertObjectToArray(object $object): array

@@ -27,7 +27,7 @@ final class LatinPluralRelationTest extends FrameworkIntegrationTestCase
         );
 
         $this->assertSame(
-            expected: 'LEFT JOIN metadata ON metadata.id = products.product_metadata_id',
+            expected: 'LEFT JOIN `metadata` ON `metadata`.`id` = `products`.`product_metadata_id`',
             actual: $relation
                 ->getJoinStatement()
                 ->compile(dialect: DatabaseDialect::SQLITE),
