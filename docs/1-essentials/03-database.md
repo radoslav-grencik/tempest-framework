@@ -383,6 +383,8 @@ LEFT JOIN tags ON tags.id = authors_tags.tag_id
 A custom pivot table name and join fields can be specified:
 
 ```php
+use Tempest\Database\BelongsToMany;
+
 #[BelongsToMany(
     pivot: 'custom_pivot_table',
     ownerJoin: 'custom_author_fk',
@@ -562,7 +564,69 @@ $author = Author::create(displayName: 'Ada');
 $author = Author::select()->whereField('displayName', 'Ada')->first();
 ```
 
-The attribute also works on primary keys (including UUIDs) and on `BelongsTo` properties to name the foreign key on the owning table. Virtual properties and inverse relations such as `HasMany` don't have a column of their own. In migrations and raw SQL, use the database column name directly; the attribute does not change the database schema.
+The attribute also works on primary keys (including UUIDs) and on `BelongsTo` properties to name the foreign key on the owning table. Virtual properties and inverse relations such as `HasMany` don't have a column of their own.
+
+For example, the PHP properties and database columns can use different names on both sides of a relation:
+
+```php
+use Tempest\Database\BelongsTo;
+use Tempest\Database\Column;
+use Tempest\Database\HasMany;
+use Tempest\Database\IsDatabaseModel;
+use Tempest\Database\PrimaryKey;
+
+final class Author
+{
+    use IsDatabaseModel;
+
+    #[Column('author_id')]
+    public PrimaryKey $id;
+
+    /** @var Book[] */
+    #[HasMany(ownerJoin: 'writer_id')]
+    public array $books = [];
+}
+
+final class Book
+{
+    use IsDatabaseModel;
+
+    #[Column('book_id')]
+    public PrimaryKey $id;
+
+    #[Column('writer_id')]
+    public Author $author;
+}
+
+$author = Author::create();
+Book::create(author: $author);
+
+$book = Book::select()
+    ->with('author')
+    ->whereHas('author', function ($query) use ($author): void {
+        $query->whereField('id', $author->id);
+    })
+    ->first();
+```
+
+The query builder accepts PHP property names such as `id`, `author`, and `displayName`. Tempest translates them to their mapped database columns when compiling SQL. This applies to selects, filters, ordering, grouping, aggregates, inserts, updates, deletes, eager loading, and relation existence filters such as `whereHas`.
+
+Relation join options use physical database column names. For example, `ownerJoin: 'writer_id'` refers to the column in the related table, not to a PHP property name. The same rule applies to `relationJoin`, `throughOwnerJoin`, `throughRelationJoin`, and the join fields of `BelongsToMany` pivot tables:
+
+```php
+#[BelongsToMany(
+    pivot: 'author_books',
+    ownerJoin: 'author_ref',
+    relationJoin: 'author_id',
+    relatedOwnerJoin: 'book_ref',
+    relatedRelationJoin: 'book_id',
+)]
+public array $books = [];
+```
+
+Mapped primary keys are used automatically when `HasOneThrough` and `HasManyThrough` derive their join columns from conventions. If a foreign key does not follow the convention, specify `ownerJoin`, `relationJoin`, `throughOwnerJoin`, or `throughRelationJoin`. These options refer to physical database column names, while `#[Column]` maps PHP properties to those columns.
+
+In migrations and raw SQL, always use the physical database column name directly. The attribute changes how Tempest maps a property, but it does not rename or create a database column.
 
 ### Migration directories
 
