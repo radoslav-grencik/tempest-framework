@@ -4,6 +4,7 @@ namespace Tests\Tempest\Integration\Database\ModelInspector;
 
 use PHPUnit\Framework\Attributes\Test;
 use Tempest\Database\BelongsTo;
+use Tempest\Database\Builder\QueryBuilders\SelectQueryBuilder;
 use Tempest\Database\Config\DatabaseDialect;
 use Tempest\Database\Config\PostgresConfig;
 use Tempest\Database\Connection\PDOConnection;
@@ -11,6 +12,7 @@ use Tempest\Database\Database;
 use Tempest\Database\Exceptions\ModelDidNotHavePrimaryColumn;
 use Tempest\Database\GenericDatabase;
 use Tempest\Database\HasMany;
+use Tempest\Database\HasOne;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
 use Tempest\Database\Transactions\GenericTransactionManager;
@@ -19,6 +21,7 @@ use Tempest\Mapper\SerializerFactory;
 use Tests\Tempest\Integration\FrameworkIntegrationTestCase;
 
 use function Tempest\Database\inspect;
+use function Tempest\Database\query;
 
 final class BelongsToTest extends FrameworkIntegrationTestCase
 {
@@ -279,6 +282,67 @@ final class BelongsToTest extends FrameworkIntegrationTestCase
     }
 
     #[Test]
+    public function self_referencing_belongs_to_filters_correlate_the_related_row(): void
+    {
+        $sql = query(SelfReferencingCategoryModel::class)
+            ->select()
+            ->whereHas(relation: 'parent')
+            ->compile();
+
+        $this->assertStringContainsString(
+            'EXISTS (SELECT 1 FROM `categories` AS `target_table` WHERE `target_table`.`id` = `categories`.`parent_id`)',
+            $sql,
+        );
+    }
+
+    #[Test]
+    public function self_referencing_filters_apply_callbacks_to_the_related_row(): void
+    {
+        $sql = query(SelfReferencingCategoryModel::class)
+            ->select()
+            ->whereHas(
+                relation: 'children',
+                callback: function (SelectQueryBuilder $query): void {
+                    $query->whereField('name', 'Child');
+                },
+            )
+            ->compile();
+
+        $this->assertStringContainsString(
+            '`target_table`.`parent_id` = `categories`.`id` AND `target_table`.`name` = ?',
+            $sql,
+        );
+    }
+
+    #[Test]
+    public function self_referencing_has_one_filters_correlate_the_related_row(): void
+    {
+        $sql = query(SelfReferencingCategoryModel::class)
+            ->select()
+            ->whereHas(relation: 'onlyChild')
+            ->compile();
+
+        $this->assertStringContainsString(
+            'EXISTS (SELECT 1 FROM `categories` AS `target_table` WHERE `target_table`.`parent_id` = `categories`.`id`)',
+            $sql,
+        );
+    }
+
+    #[Test]
+    public function self_referencing_has_many_filters_correlate_the_related_row(): void
+    {
+        $sql = query(SelfReferencingCategoryModel::class)
+            ->select()
+            ->whereHas(relation: 'children')
+            ->compile();
+
+        $this->assertStringContainsString(
+            'EXISTS (SELECT 1 FROM `categories` AS `target_table` WHERE `target_table`.`parent_id` = `categories`.`id`)',
+            $sql,
+        );
+    }
+
+    #[Test]
     public function self_referencing_has_many_select_fields(): void
     {
         $model = inspect(SelfReferencingCategoryModel::class);
@@ -438,4 +502,7 @@ final class SelfReferencingCategoryModel
     /** @var \Tests\Tempest\Integration\Database\ModelInspector\SelfReferencingCategoryModel[] */
     #[HasMany(ownerJoin: 'parent_id', relationJoin: 'id')]
     public array $children = [];
+
+    #[HasOne(ownerJoin: 'parent_id', relationJoin: 'id')]
+    public ?SelfReferencingCategoryModel $onlyChild = null;
 }

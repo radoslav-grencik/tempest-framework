@@ -23,6 +23,7 @@ final readonly class WhereExistsStatement implements QueryStatement
         private int $count = 1,
         public ?self $targetExists = null,
         private bool $materialize = false,
+        public ?string $relatedTableAlias = null,
     ) {}
 
     public function compile(DatabaseDialect $dialect): string
@@ -74,11 +75,26 @@ final readonly class WhereExistsStatement implements QueryStatement
                 ->toString();
 
             if ($compiled !== '') {
+                if ($this->relatedTableAlias !== null) {
+                    $compiled = str(string: $compiled)->replace(
+                        search: "{$this->relatedTable}.",
+                        replace: "`{$this->relatedTableAlias}`.",
+                    )->toString();
+                }
+
                 $whereClause = $whereClause->append(suffix: " AND {$compiled}");
             }
         }
 
         $fromClause = $this->relatedTable;
+
+        if ($this->relatedTableAlias !== null) {
+            $fromClause .= ' AS `' . $this->relatedTableAlias . '`';
+            $whereClause = $whereClause->replaceFirst(
+                search: "{$this->relatedTable}.",
+                replace: "`{$this->relatedTableAlias}`.",
+            );
+        }
 
         if ($this->materialize && $dialect === DatabaseDialect::MYSQL) {
             $alias = '`target_table`';

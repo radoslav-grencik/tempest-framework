@@ -145,6 +145,7 @@ final class BelongsTo implements Relation
         $parentTable = $parentModel->getTableName();
         $relatedPK = $relatedModel->getPrimaryKeyColumn();
         $fk = $this->getOwnerFieldName();
+        $selfReferencing = $relatedTable === $parentTable;
 
         return new WhereExistsStatement(
             relatedTable: $this->quoteIdentifier($relatedTable),
@@ -154,6 +155,7 @@ final class BelongsTo implements Relation
                 $this->qualifyIdentifier((string) $relatedPK, $relatedTable),
                 $this->qualifyIdentifier($fk, $parentTable),
             ),
+            relatedTableAlias: $selfReferencing ? 'target_table' : null,
         );
     }
 

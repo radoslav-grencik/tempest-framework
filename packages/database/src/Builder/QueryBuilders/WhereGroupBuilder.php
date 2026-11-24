@@ -303,6 +303,7 @@ final class WhereGroupBuilder
             operator: $operator,
             count: $count,
             targetExists: $existsStatement->targetExists,
+            relatedTableAlias: $existsStatement->relatedTableAlias,
         );
 
         if ($this->conditions !== []) {

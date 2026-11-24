@@ -160,6 +160,7 @@ final class HasMany implements Relation
         $parentTable = $parentModel->getTableName();
         $parentPK = $parentModel->getPrimaryKeyColumn();
         $fk = (string) ($this->ownerJoin ?? str(string: $parentTable)->singularizeLastWord()->append(suffix: "_{$parentPK}"));
+        $selfReferencing = $relatedTable === $parentTable;
 
         return new WhereExistsStatement(
             relatedTable: $this->quoteIdentifier($relatedTable),
@@ -169,6 +170,7 @@ final class HasMany implements Relation
                 $this->qualifyIdentifier($fk, $relatedTable),
                 $this->qualifyIdentifier((string) $parentPK, $parentTable),
             ),
+            relatedTableAlias: $selfReferencing ? 'target_table' : null,
         );
     }
 

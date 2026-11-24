@@ -126,6 +126,7 @@ final class HasOne implements Relation
         $parentModel = inspect(model: $this->property->getClass());
 
         $relatedTable = $relatedModel->getTableName();
+        $selfReferencing = $relatedTable === $parentModel->getTableName();
 
         return new WhereExistsStatement(
             relatedTable: $this->quoteIdentifier($relatedTable),
@@ -135,6 +136,7 @@ final class HasOne implements Relation
                 $this->quoteIdentifier($this->getOwnerJoin($relatedModel, $parentModel, $relatedTable)),
                 $this->quoteIdentifier($this->getRelationJoin($parentModel)),
             ),
+            relatedTableAlias: $selfReferencing ? 'target_table' : null,
         );
     }
 
