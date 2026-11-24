@@ -388,7 +388,8 @@ final class InsertQueryBuilder implements BuildsQuery
         foreach ($this->rows as $row) {
             $before = count($this->relationCallbacks);
 
-            $data = [...$this->resolveModelData($row), ...$this->columnValues];
+            $data = $this->resolveModelData($row);
+            $data = [...array_diff_key($data, $this->columnValues), ...$this->columnValues];
 
             $resolved[] = $data;
             $this->resolvedRows[] = $data;

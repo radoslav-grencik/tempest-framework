@@ -22,21 +22,21 @@ interface SupportsWhereStatements
     /**
      * Adds a WHERE condition to the query.
      *
-     * @return self<TModel>
+     * @return self<TModel>&static
      */
     public function whereField(string $field, mixed $value, string|WhereOperator $operator = WhereOperator::EQUALS): self;
 
     /**
      * Adds an OR WHERE condition to the query.
      *
-     * @return self<TModel>
+     * @return self<TModel>&static
      */
     public function orWhere(string $field, mixed $value, WhereOperator $operator = WhereOperator::EQUALS): self;
 
     /**
      * Adds a raw WHERE condition to the query.
      *
-     * @return self<TModel>
+     * @return self<TModel>&static
      */
     public function whereRaw(string $statement, mixed ...$bindings): self;
 }

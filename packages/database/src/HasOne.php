@@ -58,12 +58,14 @@ final class HasOne implements Relation
     {
         $ownerModel = inspect($this->property->getType()->asClass());
         $relationModel = inspect($this->property->getClass());
-        $tableAlias = $this->getTableAlias($ownerModel->getTableName());
+        $tableAlias = $this->isSelfReferencing()
+            ? $this->property->getName()
+            : $this->getTableAlias($ownerModel->getTableName());
 
         $ownerJoin = $this->getOwnerJoin(
             ownerModel: $ownerModel,
             relationModel: $relationModel,
-            tableAlias: $tableAlias,
+            tableReference: $tableAlias,
         );
         $relationJoin = $this->getRelationJoin($relationModel);
 
@@ -85,12 +87,9 @@ final class HasOne implements Relation
         ));
     }
 
-    private function getOwnerJoin(ModelInspector $ownerModel, ModelInspector $relationModel, string $tableAlias): string
+    private function getOwnerJoin(ModelInspector $ownerModel, ModelInspector $relationModel, string $tableReference): string
     {
         $ownerJoin = $this->ownerJoin;
-        $tableReference = $this->isSelfReferencing()
-            ? $this->property->getName()
-            : $tableAlias;
 
         if ($ownerJoin && ! strpos($ownerJoin, '.')) {
             $ownerJoin = sprintf(
@@ -103,7 +102,7 @@ final class HasOne implements Relation
         if ($ownerJoin) {
             return $this->replaceTableReference(
                 qualifiedColumn: $ownerJoin,
-                originalTable: inspect($this->property->getType()->asClass())->getTableName(),
+                originalTable: $ownerModel->getTableName(),
                 aliasedTable: $tableReference,
             );
         }
@@ -127,17 +126,14 @@ final class HasOne implements Relation
         $parentModel = inspect(model: $this->property->getClass());
 
         $relatedTable = $relatedModel->getTableName();
-        $parentTable = $parentModel->getTableName();
-        $parentPK = $parentModel->getPrimaryKeyColumn();
-        $fk = (string) ($this->ownerJoin ?? str(string: $parentTable)->singularizeLastWord()->append(suffix: "_{$parentPK}"));
 
         return new WhereExistsStatement(
             relatedTable: $this->quoteIdentifier($relatedTable),
             relatedModelName: $relatedModel->getName(),
             condition: sprintf(
                 '%s = %s',
-                $this->qualifyIdentifier($fk, $relatedTable),
-                $this->qualifyIdentifier((string) $parentPK, $parentTable),
+                $this->quoteIdentifier($this->getOwnerJoin($relatedModel, $parentModel, $relatedTable)),
+                $this->quoteIdentifier($this->getRelationJoin($parentModel)),
             ),
         );
     }
@@ -187,15 +183,27 @@ final class HasOne implements Relation
     public function query(PrimaryKey $primaryKey, string|UnitEnum|null $onDatabase = null): QueryBuilder
     {
         $relatedClassName = $this->property->getType()->getName();
+        $relatedModel = inspect($relatedClassName);
         $parentModel = inspect(model: $this->property->getClass());
         $parentTable = $parentModel->getTableName();
-        $parentPK = $parentModel->getPrimaryKeyColumn();
-        $fk = $this->ownerJoin ?? str(string: $parentTable)->singularizeLastWord() . '_' . $parentPK;
+        $parentKey = $parentModel->getPrimaryKeyColumn();
+        $relatedKey = $this->quoteIdentifier($this->getOwnerJoin($relatedModel, $parentModel, $relatedModel->getTableName()));
+        $statement = "{$relatedKey} = ?";
+
+        if ($this->relationJoin !== null) {
+            $statement = sprintf(
+                '%s IN (SELECT %s FROM %s WHERE %s = ?)',
+                $relatedKey,
+                $this->quoteIdentifier($this->getRelationJoin($parentModel)),
+                $this->quoteIdentifier($parentTable),
+                $this->qualifyIdentifier((string) $parentKey, $parentTable),
+            );
+        }
 
         return query(model: $relatedClassName)
             ->onDatabase(databaseTag: $onDatabase)
             ->scope(scope: new WhereRawScope(
-                statement: $this->qualifyIdentifier($fk, inspect($relatedClassName)->getTableName()) . ' = ?',
+                statement: $statement,
                 binding: $primaryKey,
             ));
     }

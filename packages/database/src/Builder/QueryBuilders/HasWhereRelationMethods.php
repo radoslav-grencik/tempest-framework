@@ -15,6 +15,11 @@ use function Tempest\Support\str;
 
 /**
  * @template TModel
+ * @property-read \Tempest\Database\Builder\ModelInspector $model
+ * @property-read ImmutableArray $wheres
+ * @method self bind(mixed ...$bindings)
+ * @phpstan-require-implements BuildsQuery
+ * @phpstan-require-implements SupportsWhereStatements
  */
 trait HasWhereRelationMethods
 {
@@ -25,7 +30,7 @@ trait HasWhereRelationMethods
      *
      * @phpstan-param (?Closure(SelectQueryBuilder): void) $callback
      *
-     * @return static<TModel>
+     * @return self<TModel>&static
      */
     public function whereHas(
         string $relation,
@@ -48,7 +53,7 @@ trait HasWhereRelationMethods
      *
      * @phpstan-param (?Closure(SelectQueryBuilder): void) $callback
      *
-     * @return static<TModel>
+     * @return self<TModel>&static
      */
     public function whereDoesntHave(
         string $relation,
@@ -69,7 +74,7 @@ trait HasWhereRelationMethods
      *
      * @phpstan-param (?Closure(SelectQueryBuilder): void) $callback
      *
-     * @return static<TModel>
+     * @return self<TModel>&static
      */
     public function orWhereHas(
         string $relation,
@@ -92,7 +97,7 @@ trait HasWhereRelationMethods
      *
      * @phpstan-param (?Closure(SelectQueryBuilder): void) $callback
      *
-     * @return static<TModel>
+     * @return self<TModel>&static
      */
     public function orWhereDoesntHave(
         string $relation,
@@ -120,6 +125,7 @@ trait HasWhereRelationMethods
             separator: '.',
             limit: 2,
         );
+
         $relationName = (string) $parts[0];
         $nestedPath = isset($parts[1])
             ? (string) $parts[1]
@@ -163,6 +169,7 @@ trait HasWhereRelationMethods
             useCount: $useCount,
             operator: $operator,
             count: $count,
+            targetExists: $existsStatement->targetExists,
         );
 
         if ($this->wheres->isNotEmpty()) {

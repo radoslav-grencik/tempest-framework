@@ -251,7 +251,7 @@ final class WhereHasTest extends FrameworkIntegrationTestCase
             ->compile();
 
         $this->assertSameWithoutBackticks(
-            'SELECT tags.id AS tags.id, tags.label AS tags.label FROM tags WHERE EXISTS (SELECT 1 FROM books_tags WHERE books_tags.tag_id = tags.id)',
+            'SELECT tags.id AS tags.id, tags.label AS tags.label FROM tags WHERE EXISTS (SELECT 1 FROM books_tags INNER JOIN books ON books.id = books_tags.book_id WHERE books_tags.tag_id = tags.id)',
             $sql,
         );
     }
@@ -327,7 +327,7 @@ final class WhereHasTest extends FrameworkIntegrationTestCase
             ->compile();
 
         $this->assertSameWithoutBackticks(
-            'SELECT tags.id AS tags.id, tags.label AS tags.label FROM tags WHERE EXISTS (SELECT 1 FROM book_reviews WHERE book_reviews.tag_id = tags.id)',
+            'SELECT tags.id AS tags.id, tags.label AS tags.label FROM tags WHERE EXISTS (SELECT 1 FROM book_reviews INNER JOIN reviewers ON reviewers.book_review_id = book_reviews.id WHERE book_reviews.tag_id = tags.id)',
             $sql,
         );
     }
@@ -340,7 +340,7 @@ final class WhereHasTest extends FrameworkIntegrationTestCase
             ->compile();
 
         $this->assertSameWithoutBackticks(
-            'SELECT tags.id AS tags.id, tags.label AS tags.label FROM tags WHERE EXISTS (SELECT 1 FROM book_reviews WHERE book_reviews.tag_id = tags.id)',
+            'SELECT tags.id AS tags.id, tags.label AS tags.label FROM tags WHERE EXISTS (SELECT 1 FROM book_reviews INNER JOIN reviewers ON reviewers.book_review_id = book_reviews.id WHERE book_reviews.tag_id = tags.id)',
             $sql,
         );
     }

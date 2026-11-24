@@ -7,8 +7,6 @@ use Tempest\Database\Config\DatabaseDialect;
 use Tempest\Database\QueryStatement;
 use Tempest\Support\Arr\ImmutableArray;
 
-use function Tempest\Support\str;
-
 final class SelectStatement implements QueryStatement, HasWhereStatements
 {
     public function __construct(
@@ -56,7 +54,7 @@ final class SelectStatement implements QueryStatement, HasWhereStatements
                     continue;
                 }
 
-                foreach (str($field)->explode(',') as $splitField) {
+                foreach (self::splitFields((string) $field) as $splitField) {
                     $compiledColumns[] = new FieldStatement($splitField)->compile($dialect);
                 }
             }
@@ -116,6 +114,39 @@ final class SelectStatement implements QueryStatement, HasWhereStatements
         }
 
         return implode(' ', $query);
+    }
+
+    /** @return list<string> */
+    public static function splitFields(string $fields): array
+    {
+        $parts = [];
+        $start = 0;
+        $depth = 0;
+        $quote = null;
+
+        // shortcut: handles standard quotes and parentheses, extend for dialect-specific literal syntax when needed
+        for ($i = 0, $length = strlen($fields); $i < $length; $i++) {
+            $character = $fields[$i];
+
+            if ($quote !== null) {
+                if ($character === $quote) {
+                    $quote = null;
+                }
+            } elseif (in_array($character, ["'", '"', '`'], true)) {
+                $quote = $character;
+            } elseif ($character === '(') {
+                $depth++;
+            } elseif ($character === ')') {
+                $depth--;
+            } elseif ($character === ',' && $depth === 0) {
+                $parts[] = trim(substr($fields, $start, $i - $start));
+                $start = $i + 1;
+            }
+        }
+
+        $parts[] = trim(substr($fields, $start));
+
+        return $parts;
     }
 
     public function __clone(): void

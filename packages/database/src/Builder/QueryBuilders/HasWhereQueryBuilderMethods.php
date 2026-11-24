@@ -45,6 +45,8 @@ trait HasWhereQueryBuilderMethods
      * ->where('price > ?', $value); // calls `whereRaw`
      * ->where('price', $value); // calls `whereField`
      * ```
+     *
+     * @return self<TModel>&static
      */
     public function where(string $statement, mixed ...$bindings): self
     {
@@ -57,6 +59,8 @@ trait HasWhereQueryBuilderMethods
 
     /**
      * Adds a where condition to the query.
+     *
+     * @return self<TModel>&static
      */
     public function whereField(string $field, mixed $value, string|WhereOperator $operator = WhereOperator::EQUALS): self
     {
@@ -76,6 +80,8 @@ trait HasWhereQueryBuilderMethods
 
     /**
      * Adds an `AND WHERE` condition to the query.
+     *
+     * @return self<TModel>&static
      */
     public function andWhere(string $field, mixed $value, WhereOperator $operator = WhereOperator::EQUALS): self
     {
@@ -91,6 +97,8 @@ trait HasWhereQueryBuilderMethods
 
     /**
      * Adds an `OR WHERE` condition to the query.
+     *
+     * @return self<TModel>&static
      */
     public function orWhere(string $field, mixed $value, WhereOperator $operator = WhereOperator::EQUALS): self
     {
@@ -106,6 +114,8 @@ trait HasWhereQueryBuilderMethods
 
     /**
      * Adds a raw SQL `WHERE` condition to the query.
+     *
+     * @return self<TModel>&static
      */
     public function whereRaw(string $statement, mixed ...$bindings): self
     {
@@ -121,6 +131,8 @@ trait HasWhereQueryBuilderMethods
 
     /**
      * Adds a raw SQL `AND WHERE` condition to the query.
+     *
+     * @return self<TModel>&static
      */
     public function andWhereRaw(string $rawCondition, mixed ...$bindings): self
     {
@@ -132,6 +144,8 @@ trait HasWhereQueryBuilderMethods
 
     /**
      * Adds a raw SQL `OR WHERE` condition to the query.
+     *
+     * @return self<TModel>&static
      */
     public function orWhereRaw(string $rawCondition, mixed ...$bindings): self
     {

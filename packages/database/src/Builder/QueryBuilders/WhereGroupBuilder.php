@@ -302,6 +302,7 @@ final class WhereGroupBuilder
             useCount: $useCount,
             operator: $operator,
             count: $count,
+            targetExists: $existsStatement->targetExists,
         );
 
         if ($this->conditions !== []) {

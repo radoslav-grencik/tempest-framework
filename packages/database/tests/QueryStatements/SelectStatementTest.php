@@ -3,6 +3,7 @@
 namespace Tempest\Database\Tests\QueryStatements;
 
 use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\Attributes\TestWith;
 use PHPUnit\Framework\TestCase;
 use Tempest\Database\Builder\FieldDefinition;
 use Tempest\Database\Builder\TableDefinition;
@@ -39,5 +40,18 @@ final class SelectStatementTest extends TestCase
         $expectedMysql = 'SELECT `a`, `b`, `c`, `bar`.`d` AS `d_alias` FROM `foo` AS `bar` INNER JOIN foo ON bar.id = foo.id WHERE `foo` = "bar" GROUP BY `foo` HAVING `foo` = "bar" ORDER BY `foo` DESC LIMIT 10 OFFSET 100';
 
         $this->assertSame($expectedMysql, $statement->compile(DatabaseDialect::MYSQL));
+    }
+
+    #[Test]
+    #[TestWith([DatabaseDialect::MYSQL, "SELECT `a`, REPLACE(foo.b, 'x', 'y') AS `label`, 'it''s, fine' AS `note` FROM `foo`"])]
+    #[TestWith([DatabaseDialect::POSTGRESQL, 'SELECT "a", REPLACE(foo.b, \'x\', \'y\') AS "label", \'it\'\'s, fine\' AS "note" FROM `foo`'])]
+    public function projection_lists_keep_commas_inside_expressions_and_literals(DatabaseDialect $dialect, string $expected): void
+    {
+        $statement = new SelectStatement(
+            table: new TableDefinition('foo'),
+            fields: arr(["a, REPLACE(foo.b, 'x', 'y') AS label, 'it''s, fine' AS note"]),
+        );
+
+        $this->assertSame($expected, $statement->compile($dialect));
     }
 }

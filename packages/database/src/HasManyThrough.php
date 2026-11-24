@@ -343,6 +343,10 @@ final class HasManyThrough implements Relation
         $intermediatePK = $intermediateModel->getPrimaryKeyColumn();
         $targetFK = $this->throughOwnerJoin ?? str(string: $intermediateTable)->singularizeLastWord()->append(suffix: "_{$intermediatePK}");
 
+        $targetReference = $this->quoteIdentifier($targetTable);
+        $targetCondition = $this->qualifyIdentifier((string) $targetFK, $targetTable) . ' = ' . $this->qualifyIdentifier((string) $intermediatePK, $intermediateTable);
+        $selfReferencing = $ownerTable === $targetTable;
+
         return new WhereExistsStatement(
             relatedTable: $this->quoteIdentifier($intermediateTable),
             relatedModelName: $targetModel->getName(),
@@ -351,14 +355,14 @@ final class HasManyThrough implements Relation
                 $this->qualifyIdentifier((string) $fk, $intermediateTable),
                 $this->qualifyIdentifier((string) $ownerPK, $ownerTable),
             ),
-            joinStatement: new JoinStatement(
-                statement: sprintf(
-                    'INNER JOIN %s ON %s = %s',
-                    $this->quoteIdentifier($targetTable),
-                    $this->qualifyIdentifier((string) $targetFK, $targetTable),
-                    $this->qualifyIdentifier((string) $intermediatePK, $intermediateTable),
-                ),
-            ),
+            joinStatement: $selfReferencing ? null : new JoinStatement("INNER JOIN {$targetReference} ON {$targetCondition}"),
+            targetExists: $selfReferencing
+                ? new WhereExistsStatement(
+                    relatedTable: $targetReference,
+                    relatedModelName: $targetModel->getName(),
+                    condition: $targetCondition,
+                    materialize: $selfReferencing,
+                ) : null,
         );
     }
 

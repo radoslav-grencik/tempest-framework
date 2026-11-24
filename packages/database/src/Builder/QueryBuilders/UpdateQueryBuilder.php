@@ -106,6 +106,7 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
         $builder->onDatabase = $source->onDatabase;
 
         /** @var UpdateQueryBuilder<TSourceModel> $builder */
+
         return $builder;
     }
 
@@ -641,7 +642,7 @@ final class UpdateQueryBuilder implements BuildsQuery, SupportsWhereStatements
     /**
      * Adds a where condition to the query.
      *
-     * @return self<TModel>
+     * @return self<TModel>&static
      */
     public function whereField(string $field, mixed $value, string|WhereOperator $operator = WhereOperator::EQUALS): self
     {

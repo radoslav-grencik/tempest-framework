@@ -119,6 +119,7 @@ final class BelongsToMany implements Relation
             ownerModel: $ownerModel,
             targetModel: $targetModel,
         );
+
         return new JoinStatement(
             statement: sprintf(
                 '%s %s',
@@ -376,6 +377,10 @@ final class BelongsToMany implements Relation
         $targetPK = $targetModel->getPrimaryKeyColumn();
         $targetFK = $this->relatedOwnerJoin ?? str(string: $targetTable)->singularizeLastWord()->append(suffix: "_{$targetPK}");
 
+        $targetCondition = $this->qualifyIdentifier((string) $targetPK, $targetTable) . ' = ' . $this->qualifyIdentifier((string) $targetFK, $pivotTable);
+        $targetReference = $this->quoteIdentifier($targetTable);
+        $selfReferencing = $ownerTable === $targetTable;
+
         return new WhereExistsStatement(
             relatedTable: $this->quoteIdentifier($pivotTable),
             relatedModelName: $targetModel->getName(),
@@ -384,14 +389,14 @@ final class BelongsToMany implements Relation
                 $this->qualifyIdentifier((string) $fk, $pivotTable),
                 $this->qualifyIdentifier((string) $ownerPK, $ownerTable),
             ),
-            joinStatement: new JoinStatement(
-                statement: sprintf(
-                    'INNER JOIN %s ON %s = %s',
-                    $this->quoteIdentifier($targetTable),
-                    $this->qualifyIdentifier((string) $targetPK, $targetTable),
-                    $this->qualifyIdentifier((string) $targetFK, $pivotTable),
-                ),
-            ),
+            joinStatement: $selfReferencing ? null : new JoinStatement("INNER JOIN {$targetReference} ON {$targetCondition}"),
+            targetExists: $selfReferencing
+                ? new WhereExistsStatement(
+                    relatedTable: $targetReference,
+                    relatedModelName: $targetModel->getName(),
+                    condition: $targetCondition,
+                    materialize: $selfReferencing,
+                ) : null,
         );
     }
 
