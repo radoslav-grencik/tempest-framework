@@ -340,6 +340,135 @@ final class ColumnRelationsTest extends FrameworkIntegrationTestCase
         $this->assertEquals($other->ownerId->value, $pivot[0]['mapped_owner_owner_id']);
         $this->assertEquals($first->itemId->value, $pivot[0]['mapped_item_item_id']);
     }
+
+    #[Test]
+    public function mapped_has_many_and_has_one_are_scoped_to_each_owner(): void
+    {
+        $this->database->migrate(CreateMigrationsTable::class, MappedOwner::class, MappedEntry::class);
+
+        $first = MappedOwner::create(ownerName: 'First', entries: [['entryName' => 'First entry']]);
+        $second = MappedOwner::create(ownerName: 'Second', entries: [['entryName' => 'Second entry']]);
+
+        $firstEntries = $first->query('entries')->select()->all();
+        $secondEntry = MappedOwner::select()->with('entry')->get($second->ownerId)->entry;
+
+        $this->assertSame(['First entry'], array_column($firstEntries, 'entryName'));
+        $this->assertSame('Second entry', $secondEntry->entryName);
+        $this->assertSame('First entry', $first->query('entry')->select()->first()->entryName);
+    }
+
+    #[Test]
+    public function mapped_belongs_to_filters_keep_null_and_different_targets_separate(): void
+    {
+        $this->database->migrate(CreateMigrationsTable::class, MappedOwner::class, MappedEntry::class, MappedItem::class);
+
+        $first = MappedOwner::create(ownerName: 'First', entries: [['entryName' => 'First entry']]);
+        $second = MappedOwner::create(ownerName: 'Second', entries: [['entryName' => 'Second entry']]);
+        $firstEntry = $first->query('entries')->select()->first();
+        $secondEntry = $second->query('entries')->select()->first();
+
+        MappedItem::create(itemName: 'First item', entry: $firstEntry);
+        MappedItem::create(itemName: 'Second item', entry: $secondEntry);
+        MappedItem::create(itemName: 'Unassigned');
+
+        $matching = MappedItem::select()
+            ->whereHas('entry', function (SelectQueryBuilder $query): void {
+                $query->whereField('entryName', 'First entry');
+            })
+            ->all();
+
+        $without = MappedItem::select()->whereDoesntHave('entry')->all();
+
+        $this->assertSame(['First item'], array_column($matching, 'itemName'));
+        $this->assertSame(['Unassigned'], array_column($without, 'itemName'));
+    }
+
+    #[Test]
+    public function mapped_belongs_to_callbacks_filter_the_related_row_at_runtime(): void
+    {
+        $this->database->migrate(CreateMigrationsTable::class, MappedItem::class, MappedEntry::class);
+
+        $owner = MappedItem::create(itemName: 'Owner');
+        $target = MappedItem::create(itemName: 'Target');
+        $entry = MappedEntry::create(ownerRef: $owner->itemId->value, entryName: 'Link');
+        query('mapped_items')->update(entry_entry_id: $entry->entryId)->whereField('item_id', $target->itemId)->execute();
+
+        $matching = MappedItem::select()
+            ->whereHas('entry', function (SelectQueryBuilder $query): void {
+                $query->whereField('entryName', 'Link');
+            })
+            ->all();
+
+        $this->assertSame(['Target'], array_column($matching, 'itemName'));
+    }
+
+    #[Test]
+    public function self_referencing_through_count_does_not_match_unrelated_rows(): void
+    {
+        $this->database->migrate(CreateMigrationsTable::class, MappedItem::class, MappedEntry::class);
+
+        $owner = MappedItem::create(itemName: 'Owner');
+        $other = MappedItem::create(itemName: 'Other');
+        $entry = MappedEntry::create(ownerRef: $owner->itemId->value, entryName: 'Link');
+        query('mapped_items')
+            ->insert(
+                ['item_name' => 'Target A', 'mapped_entry_entry_id' => $entry->entryId],
+                ['item_name' => 'Target B', 'mapped_entry_entry_id' => $entry->entryId],
+            )
+            ->execute();
+
+        $matching = MappedItem::select()->whereHas('connectedItems', count: 2)->all();
+        $notMatching = MappedItem::select()->whereHas('connectedItems', count: 3)->all();
+
+        $this->assertSame(['Owner'], array_column($matching, 'itemName'));
+        $this->assertSame([], $notMatching);
+        $this->assertSame([], $other->query('connectedItems')->select()->all());
+    }
+
+    #[Test]
+    public function self_referencing_pivot_callback_excludes_a_missing_target_row(): void
+    {
+        $this->database->migrate(CreateMigrationsTable::class, MappedItem::class, MappedPivot::class);
+
+        $owner = MappedItem::create(itemName: 'Owner');
+        $target = MappedItem::create(itemName: 'Target');
+        query('mapped_pivot')
+            ->insert(
+                ['mapped_item_item_id' => $owner->itemId, 'mapped_owner_owner_id' => $target->itemId],
+                ['mapped_item_item_id' => $owner->itemId, 'mapped_owner_owner_id' => 999],
+            )
+            ->execute();
+
+        $matching = MappedItem::select()->whereHas(
+            'peers',
+            function (SelectQueryBuilder $query): void {
+                $query->whereField('itemName', 'Target');
+            },
+        )->all();
+        $missing = MappedItem::select()->whereHas(
+            'peers',
+            function (SelectQueryBuilder $query): void {
+                $query->whereField('itemName', 'Missing');
+            },
+        )->all();
+
+        $this->assertSame(['Owner'], array_column($matching, 'itemName'));
+        $this->assertSame([], $missing);
+    }
+
+    #[Test]
+    public function mapped_self_referencing_relation_sql_is_quoted_for_postgresql(): void
+    {
+        $statement = inspect(MappedItem::class)
+            ->getRelation('peers')
+            ->getExistsStatement();
+
+        $sql = $statement->compile(DatabaseDialect::POSTGRESQL);
+
+        $this->assertStringContainsString('EXISTS (SELECT 1 FROM "mapped_pivot"', $sql);
+        $this->assertStringContainsString('"mapped_pivot"."mapped_item_item_id" = "mapped_items"."item_id"', $sql);
+        $this->assertStringContainsString('"mapped_items"."item_id" = "mapped_pivot"."mapped_owner_owner_id"', $sql);
+    }
 }
 
 #[Table('mapped_owners')]
